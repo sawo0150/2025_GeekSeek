@@ -1,0 +1,5 @@
+# VarNet 경량 버전
+net_name: varnet_small
+cascade: 1
+chans: 9
+sens_chans: 4

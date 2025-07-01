@@ -1,0 +1,2 @@
+data_path_train: /Data/train/
+data_path_val:   /Data/val/

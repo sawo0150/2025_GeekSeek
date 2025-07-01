@@ -7,3 +7,5 @@ scikit-image
 pyyaml
 opencv-python
 matplotlib
+wandb
+hydra-core==1.3.*

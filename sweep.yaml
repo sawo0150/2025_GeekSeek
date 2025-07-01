@@ -1,0 +1,18 @@
+method: bayes          # bayesian optimization
+metric:
+  name: val_ssim       # train_part.py에서 wandb.log할 metric 이름
+  goal: maximize
+
+parameters:
+  lr:
+    min: 1e-4
+    max: 3e-3
+    distribution: log_uniform
+  batch_size:
+    values: [1, 2]
+  model.cascade:
+    values: [1, 4, 8]
+  model.chans:
+    values: [9, 18]
+  seed:
+    values: [123, 430, 777]
