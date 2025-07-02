@@ -108,7 +108,8 @@ def train(args):
     best_val_loss = 1.
     start_epoch = 0
 
-    
+    print(args.data_path_train)
+    print(args.data_path_val)
     train_loader = create_data_loaders(data_path = args.data_path_train, args = args, shuffle=True)
     val_loader = create_data_loaders(data_path = args.data_path_val, args = args)
     

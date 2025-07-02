@@ -1,0 +1,12 @@
+{"time":"2025-07-02T16:31:25.492148769+09:00","level":"INFO","msg":"stream: starting","core version":"0.21.0"}
+{"time":"2025-07-02T16:31:25.835841633+09:00","level":"INFO","msg":"stream: created new stream","id":"aw2ghzln"}
+{"time":"2025-07-02T16:31:25.835876909+09:00","level":"INFO","msg":"stream: started","id":"aw2ghzln"}
+{"time":"2025-07-02T16:31:25.835895293+09:00","level":"INFO","msg":"writer: Do: started","stream_id":"aw2ghzln"}
+{"time":"2025-07-02T16:31:25.835906895+09:00","level":"INFO","msg":"sender: started","stream_id":"aw2ghzln"}
+{"time":"2025-07-02T16:31:25.83592+09:00","level":"INFO","msg":"handler: started","stream_id":"aw2ghzln"}
+{"time":"2025-07-02T16:31:27.59614383+09:00","level":"INFO","msg":"stream: closing","id":"aw2ghzln"}
+{"time":"2025-07-02T16:31:28.33926875+09:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2025-07-02T16:31:28.632871261+09:00","level":"INFO","msg":"handler: closed","stream_id":"aw2ghzln"}
+{"time":"2025-07-02T16:31:28.632883494+09:00","level":"INFO","msg":"writer: Close: closed","stream_id":"aw2ghzln"}
+{"time":"2025-07-02T16:31:28.632906176+09:00","level":"INFO","msg":"sender: closed","stream_id":"aw2ghzln"}
+{"time":"2025-07-02T16:31:28.632930342+09:00","level":"INFO","msg":"stream: closed","id":"aw2ghzln"}

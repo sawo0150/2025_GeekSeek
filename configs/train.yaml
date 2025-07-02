@@ -1,8 +1,9 @@
 defaults:
-  - model: varnet_small   # ¸ğµ¨ ¼³Á¤
-  - data: local           # µ¥ÀÌÅÍ °æ·Î ¼³Á¤
+  - _self_
+  - model: varnet_small   # ëª¨ë¸ ì„¤ì •
+  - data: local_sangwonDesktop           # ë°ì´í„° ê²½ë¡œ ì„¤ì •
 
-# === °øÅë ÇĞ½À ÇÏÀÌÆÛÆÄ¶ó¹ÌÅÍ ===
+# === ê³µí†µ í•™ìŠµ í•˜ì´í¼íŒŒë¼ë¯¸í„° ===
 GPU_NUM: 0
 batch_size: 1
 num_epochs: 5
@@ -10,6 +11,11 @@ lr: 1e-3
 report_interval: 500
 seed: 430
 
+# these three are *required* by utils/data/load_data.py â†’ create_data_loaders
+input_key:  kspace
+target_key: image_label
+max_key:    max
+
 wandb:
   project: fastmri-2025
-  entity: your_team        # W&B ÆÀ/°èÁ¤
+  entity: swpants05-seoul-national-university        # W&B íŒ€/ê³„ì •

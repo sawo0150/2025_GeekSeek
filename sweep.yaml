@@ -1,6 +1,6 @@
 method: bayes          # bayesian optimization
 metric:
-  name: val_ssim       # train_part.py¿¡¼­ wandb.logÇÒ metric ÀÌ¸§
+  name: val_ssim       # train_part.pyì—ì„œ wandb.logí•  metric ì´ë¦„
   goal: maximize
 
 parameters:
@@ -9,9 +9,9 @@ parameters:
     max: 3e-3
     distribution: log_uniform
   batch_size:
-    values: [1, 2]
+    values: 1
   model.cascade:
-    values: [1, 4, 8]
+    values: [1, 4]
   model.chans:
     values: [9, 18]
   seed:

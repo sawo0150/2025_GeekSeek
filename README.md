@@ -1,109 +1,139 @@
-# 2025 baby varnet
-2025 SNU FastMRI challenge
+# FastMRI Challenge 2025 · Baby VarNet 리포지터리
 
-## 1. 폴더 계층
+> **한 줄 요약** — MRI 재구성 모델 연구를 위한 트레이닝∙인퍼런스 파이프라인에 Hydra (파라미터 관리)와 Weights & Biases (실험 트래킹)를 통합했습니다. YAML 오버라이드 한 줄이면 새 실험을 만들고, W\&B 대시보드에서 모든 로그를 실시간으로 볼 수 있습니다.
 
-### 폴더의 전체 구조
-![image](docs/fastmri_folder_structure.png)
-* `FastMRI_challenge`, `Data`, `result` 폴더가 위의 구조대로 설정되어 있어야 default argument를 활용할 수 있습니다.
-* 본 github repository는 `FastMRI_challenge` 폴더입니다.
-* `Data` 폴더는 MRI data 파일을 담고 있으며 아래에 상세 구조를 첨부하겠습니다.
-* `result` 폴더는 학습한 모델의 weights을 기록하고 validation, leaderboard dataset의 reconstruction image를 저장하는데 활용되며, 아래에 상세 구조를 첨부하겠습니다.
+---
 
-### Data 폴더의 구조
-![image](docs/fastmri_data_structure.png)
-* train, val:
-    * train, val 폴더는 각각 모델을 학습(train), 검증(validation)하는데 사용하며 각각 image, kspace 폴더로 나뉩니다.
-    * 참가자들은 generalization과 representation의 trade-off를 고려하여 train, validation의 set을 자유로이 나눌 수 있습니다.
-    * image와 kspace 폴더에 들어있는 파일의 형식은 다음과 같습니다: {brain 또는 knee}\_{mask 형식}\_{순번}.h5
-    * ex) brain_acc8_3.h5, knee_acc4_10.h5  
-    * {mask 형식}은 "acc4", "acc8" 중 하나입니다.
-    * "acc4"의 경우 {순번}은 1 ~ 100, "acc8"의 경우 {순번}은 1 ~ 100 사이의 숫자입니다. 
-* leaderboard:
-   * **leaderboard는 성능 평가를 위해 활용하는 dataset이므로 절대로 학습 과정에 활용하면 안됩니다.**
-   * leaderboard 폴더는 mask 형식에 따라서 acc4과 acc8 폴더로 나뉩니다.
-   * acc4과 acc8 폴더는 각각 image, kspace 폴더로 나뉩니다.
-   * image와 kspace 폴더에 들어있는 파일의 형식은 다음과 같습니다: {brain 또는 knee}\_{mask 형식}\_{순번}.h5
-   * {순번}은 1 ~ 29 사이의 숫자입니다. 
+## 0. 주요 변경 사항 (Hydra & W\&B)
 
-### result 폴더의 구조
-* result 폴더는 모델의 이름에 따라서 여러 폴더로 나뉠 수 있습니다.
-* test_Unet (혹은 test_Varnet) 폴더는 아래 3개의 폴더로 구성되어 있습니다.
-  * checkpoints - `model.pt`, `best_model.pt`의 정보가 있습니다. 모델의 weights 정보를 담고 있습니다.
-  * reconstructions_val - validation dataset의 reconstruction을 저장합니다. {brain 또는 knee}\_{mask 형식}\_{순번}.h5 형식입니다. (```train.py``` 참고)
-  * reconstructions_leaderboard - leaderboard dataset의 reconstruction을 acc별로 저장합니다. {brain 또는 knee}\_test\_{순번}.h5 형식입니다. (```reconstruct.py``` 참고)
-  * val_loss_log.npy - epoch별로 validation loss를 기록합니다. (```train.py``` 참고)
+|  기능       |  기존 스크립트                      |  업데이트 후                                            |
+| --------- | ----------------------------- | -------------------------------------------------- |
+|  파라미터 관리  |  `train.py` 내 하드코딩 / bash 인자  |  `configs/*.yaml` 로 모델·데이터·학습 파라미터 모듈화             |
+|  실험 로그    |  별도 로그 없음 + npy 저장            |  W\&B 대시보드 (스칼라·이미지·히스토그램 등)                       |
+|  스윕 탐색    |  직접 for 문 스크립트 작성             |  `sweep.yaml` + `wandb sweep/agent`                |
+|  새 모델 추가  |  train.py 수정 필요               |  `utils/model/__init__.py`의 `model_registry`에 등록만  |
 
-## 2. 폴더 정보
+---
 
-```bash
-├── .gitignore
-├── leaderboard_eval.py
-├── README.md
-├── reconstruct.py
-├── requirements.txt
-├── train.py
-├── tutorial.ipynb
-└── utils
-│   ├── common
-│   │   ├── loss_function.py
-│   │   └── utils.py
-│   ├── data
-│   │   ├── load_data.py
-│   │   └── transforms.py
-│   ├── learning
-│   │   ├── test_part.py
-│   │   └── train_part.py
-│   └── model
-│       └── varnet.py
-└── result
+## 1. 폴더 구조 (요약)
+
+```
+FastMRI_challenge/
+├─ configs/        # Hydra YAML
+│  ├─ train.yaml
+│  ├─ model/
+│  │   ├─ varnet_small.yaml
+│  │   └─ varnet_large.yaml
+│  └─ data/
+│     ├─ local.yaml
+│     └─ cluster.yaml
+├─ main.py         # Hydra + W&B 진입점 ★NEW
+├─ sweep.yaml      # W&B 스윕 설정 ★NEW
+├─ utils/
+│  ├─ model/
+│  │   ├─ varnet.py
+│  │   └─ …       # 새 모델 추가 가능
+│  └─ …
+└─ result/         # 자동 생성·저장 경로
 ```
 
-## 3. Before you start
-* ```train.py```, ```reconstruct.py```, ```leaderboard_eval.py``` 순으로 코드를 실행하면 됩니다.
-* ```train.py```
-   * train/validation을 진행하고 학습한 model의 결과를 result 폴더에 저장합니다.
-   * 가장 성능이 좋은 모델의 weights을 ```best_model.pt```으로 저장합니다. 
-* ```reconstruct.py```
-   * ```train.py```으로 학습한 ```best_model.pt```을 활용해 leader_board dataset을 reconstruction하고 그 결과를 result 폴더에 저장합니다.
-   * Inference Time이 대회 GPU 기준으로 3600초를 초과할 경우 Total SSIM을 기록할 수 없습니다. 실제 Evaluation 때 조교가 확인할 예정이며, inference time은 과도하게 모델이 크지 않는다면 걱정하실 필요 없습니다.
-      * 3600초는 reconstruction process의 total time입니다. leaderboard_data --> (optional) preprocessed_data --> reconstruction하는 모든 과정이 포함되며, 여러 개의 모델을 사용하셔서 Inference를 진행하시는 경우에도 한 개의 모델이 아닌 전체 모델에 관하여 3600초를 초과해서는 안 됩니다.
-* ```leaderboard_eval.py```
-   * ```reconstruct.py```을 활용해 생성한 reconstruction의 SSIM을 측정합니다.
-   * SSIM (acc4): acc4 데이터에 대한 reconstruction의 SSIM을 측정합니다.
-   * SSIM (acc8): acc8 데이터에 대한 reconstruction의 SSIM을 측정합니다.
-   * Total SSIM은 SSIM (acc4), SSIM (acc8)의 평균으로 계산됩니다. Report할 때 이 값을 제출하시면 됩니다.
+### 1.1 Data / result 폴더 상세
 
-## 4. How to set?
-(python 3.12.9)
+기존 README 의 데이터·결과 디렉터리 설명은 변경 없으므로 [기존 문서](docs/…)를 참조하세요.
+
+---
+
+## 2. 설치
+
 ```bash
-pip3 install -r requirements.txt
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
-## 5. How to train?
-```bash
-python train.py // sh train.sh
-```
-- validation할 때, reconstruction data를 ```result/reconstructions_val/```에 저장합니다.
-- epoch 별로 validation dataset에 대한 loss를 기록합니다.
-- sh train.sh를 사용하여도 같은 결과를 얻으실 수 있습니다. Hyperparameter를 쉽게 조작할 수 있습니다.
-- **seed 고정**을 하여 이후에 Re-training하였을 때 **같은 결과가 나와야 합니다**.
+> **Python 3.9 \~ 3.12 권장**
 
-## 6. How to reconstruct?
-```bash
-python reconstruct.py // sh reconstruct.sh
-```
-- leaderboard 평가를 위한 reconstruction data를 ```result/reconstructions_leaderboard```에 저장합니다.
+---
 
-## 7. How to evaluate LeaderBoard Dataset?
-```bash
-python leaderboard_eval.py // sh leaderboard_eval.sh
-```
-- leaderboard 순위 경쟁을 위한 4X sampling mask, 8X sampling mask에 대한 SSIM 값을 한번에 구합니다.
-- Total SSIM을 제출합니다.
+## 3. 기본 학습 & 추론 명령어
 
-## 8. What to submit!
-- github repository(코드 실행 방법 readme에 상세 기록)
-- loss 그래프 혹은 기록
-- 모델 weight file
-- 모델 설명 ppt
+```bash
+# 학습 (기본 파라미터)
+python main.py
+
+# 리더보드 데이터 재구성
+python reconstruct.py --model_path result/varnet_small/checkpoints/best_model.pt
+```
+
+### 3.1 하이퍼파라미터 오버라이드 예시
+
+```bash
+# 러닝레이트와 에폭 수 변경
+python main.py lr=5e-4 num_epochs=20
+
+# 모델 바꿔 돌리기
+python main.py model=varnet_large batch_size=2
+```
+
+모든 파라미터 키는 `configs/train.yaml` 및 하위 YAML을 참고하세요.
+
+---
+
+## 4. W\&B 대시보드 사용법
+
+* 실행 시 자동으로 프로젝트가 생성되고 실험마다 러닝 커브·SSIM·이미지 프리뷰가 업로드됩니다.
+* 조직/프로젝트 경로는 `configs/train.yaml > wandb` 섹션에서 수정합니다.
+* 로깅 추가 예시 (`utils/learning/train_part.py`):
+
+  ```python
+  wandb.log({
+      "train_loss": loss.item(),
+      "val_ssim": val_ssim,
+      "lr": scheduler.get_last_lr()[0]
+  }, step=global_step)
+  ```
+
+---
+
+## 5. Sweep (하이퍼파라미터 탐색)
+
+1. `sweep.yaml` 편집 → 탐색할 파라미터만 나열
+2. 터미널에서 
+
+```bash
+wandb sweep sweep.yaml          # ID 발급
+wandb agent <SWEEP_ID>         # 에이전트 실행
+```
+
+3. Hydra 오버라이드 규칙이 그대로 적용되므로, `model.cascade`처럼 하위 키도 직접 기재 가능.
+
+---
+
+## 6. 새 모델 추가 가이드
+
+1. `utils/model/your_model.py`에 클래스 작성.
+2. `utils/model/__init__.py`에서:
+
+```python
+from .utils.model.your_model import YourModel
+model_registry["your_model"] = YourModel
+```
+
+3. `configs/model/your_model.yaml` 생성 후,
+
+```bash
+python main.py model=your_model
+```
+
+> **train\_part.py** 는 `args.net_name` 으로 모델을 선택하므로 추가 수정 필요 없습니다.
+
+---
+
+## 7. 로드맵 & 구현할 기능
+
+* \[ ] Mixed‑Precision (AMP) 지원
+* \[ ] 다중‑GPU / DDP 학습 모드
+* \[ ] 자동 데이터 다운로드 스크립트
+
+---
+

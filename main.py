@@ -1,5 +1,5 @@
 """
-Hydra + W&B ÁøÀÔ ½ºÅ©¸³Æ®
+Hydra + W&B ì§„ì… ìŠ¤í¬ë¦½íŠ¸
 FastMRI_challenge/main.py
 """
 import hydra, wandb, torch, sys, os
@@ -7,40 +7,46 @@ from omegaconf import DictConfig, OmegaConf
 from pathlib import Path
 from types import SimpleNamespace
 
-# repo ³»ºÎ ¸ğµâ ÀÓÆ÷Æ® °æ·Î È®º¸ (train.py ¹æ½Ä°ú µ¿ÀÏ) ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
+# repo ë‚´ë¶€ ëª¨ë“ˆ ì„í¬íŠ¸ ê²½ë¡œ í™•ë³´ (train.py ë°©ì‹ê³¼ ë™ì¼) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 PROJECT_ROOT = Path(__file__).resolve().parent
 for extra in ["utils/model", "utils/common"]:
     path = PROJECT_ROOT / extra
     if str(path) not in sys.path:
         sys.path.insert(1, str(path))
 
-from utils.learning.train_part import train      # ±âÁ¸ ÇĞ½À ·çÇÁ
-from utils.common.utils import seed_fix          # seed °íÁ¤ ÇÔ¼ö
+from utils.learning.train_part import train      # ê¸°ì¡´ í•™ìŠµ ë£¨í”„
+from utils.common.utils import seed_fix          # seed ê³ ì • í•¨ìˆ˜
 
-# ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def _flatten_cfg_to_args(cfg: DictConfig) -> SimpleNamespace:
     """
-    Hydra cfg ¡æ ±âÁ¸ train.py¿¡¼­ ¾²´ø args ³×ÀÓ½ºÆäÀÌ½º·Î º¯È¯
-    (train_part.py°¡ ±×´ë·Î¶ó ÇÊ¼ö)
+    Hydra cfg â†’ ê¸°ì¡´ train.pyì—ì„œ ì“°ë˜ args ë„¤ì„ìŠ¤í˜ì´ìŠ¤ë¡œ ë³€í™˜
+    (train_part.pyê°€ ê·¸ëŒ€ë¡œë¼ í•„ìˆ˜)
     """
     flat = OmegaConf.to_container(cfg, resolve=True)
     args = SimpleNamespace()
 
-    # 1) ÃÖ»óÀ§ Å°
+    # 1) ìµœìƒìœ„ í‚¤
     for k, v in flat.items():
         if k in {"model", "data", "wandb"}:
             continue
         setattr(args, k, v)
 
-    # 2) model / data ÇÏÀ§ Å°¸¦ args¿¡ ÁÖÀÔ
+    # 2) model / data í•˜ìœ„ í‚¤ë¥¼ argsì— ì£¼ì…
     for sub in ("model", "data"):
         for k, v in flat[sub].items():
             setattr(args, k, v)
 
-    # 3) train_part.py°¡ ±â´ëÇÏ´Â ´ë¹®ÀÚ ÇÊµå¸¦ ¸ÂÃçÁÜ
+    # 3) train_part.pyê°€ ê¸°ëŒ€í•˜ëŠ” ëŒ€ë¬¸ì í•„ë“œë¥¼ ë§ì¶°ì¤Œ
     args.GPU_NUM = flat["GPU_NUM"]
 
-    # 4) °á°ú °æ·Î ¼¼ÆÃ (train.py ·ÎÁ÷ ¹İ¿µ) :contentReference[oaicite:1]{index=1}
+    # 4) Path ë³€í™˜: data_path_* ë¥¼ Path ê°ì²´ë¡œ ë³€ê²½í•˜ì—¬ load_data ì—ì„œì˜ '/' ì—°ì‚° ì˜¤ë¥˜ ë°©ì§€
+    if hasattr(args, 'data_path_train'):
+        args.data_path_train = Path(args.data_path_train)
+    if hasattr(args, 'data_path_val'):
+        args.data_path_val = Path(args.data_path_val)
+
+    # 5) ê²°ê³¼ ê²½ë¡œ ì„¸íŒ… (train.py ë¡œì§ ë°˜ì˜) :contentReference[oaicite:1]{index=1}
     result_dir = PROJECT_ROOT / "result" / args.net_name
     args.exp_dir = result_dir / "checkpoints"
     args.val_dir = result_dir / "reconstructions_val"
@@ -54,14 +60,14 @@ def _flatten_cfg_to_args(cfg: DictConfig) -> SimpleNamespace:
 
 @hydra.main(config_path="configs", config_name="train", version_base=None)
 def main(cfg: DictConfig):
-    # ¦¡¦¡ 1. reproducibility ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
+    # â”€â”€ 1. reproducibility â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if cfg.seed is not None:
         seed_fix(cfg.seed)
 
-    # ¦¡¦¡ 2. cfg ¡æ args º¯È¯ -----------------------------------------------------
+    # â”€â”€ 2. cfg â†’ args ë³€í™˜ -----------------------------------------------------
     args = _flatten_cfg_to_args(cfg)
 
-    # ¦¡¦¡ 3. W&B ÃÊ±âÈ­ ----------------------------------------------------------
+    # â”€â”€ 3. W&B ì´ˆê¸°í™” ----------------------------------------------------------
     wandb.init(
         project=cfg.wandb.project,
         entity=cfg.wandb.entity,
@@ -69,13 +75,13 @@ def main(cfg: DictConfig):
         config=OmegaConf.to_container(cfg, resolve=True),
     )
 
-    # (¼±ÅÃ) ¸ğµ¨ ±×·¡µğ¾ğÆ® ÀÚµ¿ ·Î±ë
-    wandb.watch(log="all", log_freq=cfg.report_interval)
+    # (ì„ íƒ) ëª¨ë¸ ê·¸ë˜ë””ì–¸íŠ¸ ìë™ ë¡œê¹…
+    # wandb.watch(log="all", log_freq=cfg.report_interval)
 
-    # ¦¡¦¡ 4. ÇĞ½À ---------------------------------------------------------------
-    train(args)   # utils.learning.train_part.train È£Ãâ :contentReference[oaicite:2]{index=2}
+    # â”€â”€ 4. í•™ìŠµ ---------------------------------------------------------------
+    train(args)   # utils.learning.train_part.train í˜¸ì¶œ :contentReference[oaicite:2]{index=2}
 
-    # ¦¡¦¡ 5. ¸¶¹«¸® -------------------------------------------------------------
+    # â”€â”€ 5. ë§ˆë¬´ë¦¬ -------------------------------------------------------------
     wandb.finish()
 
 

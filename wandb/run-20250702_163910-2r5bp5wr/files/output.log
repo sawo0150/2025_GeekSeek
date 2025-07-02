@@ -1,0 +1,16 @@
+Current cuda device:  0
+/home/swpants05/Desktop/2025_FastMri/Data/train
+/home/swpants05/Desktop/2025_FastMri/Data/val
+Epoch # 0 ............... varnet_small ...............
+/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/model/varnet.py:286: UserWarning: where received a uint8 condition tensor. This behavior is deprecated and will be removed in a future version of PyTorch. Use a boolean condition instead. (Triggered internally at /pytorch/aten/src/ATen/native/TensorCompare.cpp:611.)
+  soft_dc = torch.where(mask, current_kspace - ref_kspace, zero) * self.dc_weight
+Epoch = [  0/  5] Iter = [   0/4937] Loss = 0.1709 Time = 0.4693s
+Epoch = [  0/  5] Iter = [ 500/4937] Loss = 0.2005 Time = 78.0871s
+Epoch = [  0/  5] Iter = [1000/4937] Loss = 0.1627 Time = 76.5665s
+Epoch = [  0/  5] Iter = [1500/4937] Loss = 0.1265 Time = 74.7420s
+Epoch = [  0/  5] Iter = [2000/4937] Loss = 0.1684 Time = 76.5627s
+Epoch = [  0/  5] Iter = [2500/4937] Loss = 0.1439 Time = 76.4566s
+Epoch = [  0/  5] Iter = [3000/4937] Loss = 0.1321 Time = 74.7219s
+Epoch = [  0/  5] Iter = [3500/4937] Loss = 0.1079 Time = 74.0398s
+Epoch = [  0/  5] Iter = [4000/4937] Loss = 0.05587 Time = 75.8786s
+Epoch = [  0/  5] Iter = [4500/4937] Loss = 0.07412 Time = 74.8265s
