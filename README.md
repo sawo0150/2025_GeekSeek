@@ -14,7 +14,7 @@
 |  새 모델 추가  |  train.py 수정 필요               |  `utils/model/__init__.py`의 `model_registry`에 등록만  |
 
 ---
-
+dddd
 ## 1. 폴더 구조 (요약)
 
 ```
