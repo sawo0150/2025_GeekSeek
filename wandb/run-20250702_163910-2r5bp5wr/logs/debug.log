@@ -19,3 +19,10 @@ config: {'GPU_NUM': 0, 'batch_size': 1, 'num_epochs': 5, 'lr': 0.001, 'report_in
 2025-07-02 16:39:11,245 INFO    MainThread:16112 [wandb_run.py:_redirect():2375] Wrapping output streams.
 2025-07-02 16:39:11,245 INFO    MainThread:16112 [wandb_run.py:_redirect():2398] Redirects installed.
 2025-07-02 16:39:11,247 INFO    MainThread:16112 [wandb_init.py:init():1075] run started, returning control to user process
+2025-07-02 17:46:17,894 INFO    MainThread:16112 [wandb_run.py:_finish():2224] finishing run swpants05-seoul-national-university/fastmri-2025/2r5bp5wr
+2025-07-02 17:46:17,901 INFO    MainThread:16112 [wandb_run.py:_atexit_cleanup():2423] got exitcode: 0
+2025-07-02 17:46:17,901 INFO    MainThread:16112 [wandb_run.py:_restore():2405] restore
+2025-07-02 17:46:17,901 INFO    MainThread:16112 [wandb_run.py:_restore():2411] restore done
+2025-07-02 17:46:18,965 INFO    MainThread:16112 [wandb_run.py:_footer_history_summary_info():3903] rendering history
+2025-07-02 17:46:18,965 INFO    MainThread:16112 [wandb_run.py:_footer_history_summary_info():3935] rendering summary
+2025-07-02 17:46:18,966 INFO    MainThread:16112 [wandb_run.py:_footer_sync_info():3864] logging synced files

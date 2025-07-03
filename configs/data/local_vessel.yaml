@@ -1,0 +1,3 @@
+data_path_train: /root/Data/train/
+data_path_val:   /root/Data/val/
+PROJECT_ROOT: /root/
