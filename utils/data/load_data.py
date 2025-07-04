@@ -1,4 +1,4 @@
-import h5py
+import h5py, re
 import random
 from utils.data.transforms import DataTransform
 from torch.utils.data import Dataset, DataLoader
@@ -10,25 +10,31 @@ class SliceData(Dataset):
         self.transform = transform
         self.input_key = input_key
         self.target_key = target_key
-        self.forward = forward
-        self.image_examples = []
-        self.kspace_examples = []
+        self.forward = forward          # test/submit 모드
+        self.image_examples = []        # [(fname, slice, cat)]
+        self.kspace_examples = []       # [(fname, slice, cat)]
 
+        # ❶ organ/acc 추출 함수 ---------------------------------------------
+        def _cat(fname: Path):
+            organ = "brain" if "brain" in fname.name.lower() else "knee"
+            acc   = "x4"   if re.search(r"_acc4_|x4|r04", fname.name, re.I) else "x8"
+            return f"{organ}_{acc}"
+        
         if not forward:
             image_files = list(Path(root / "image").iterdir())
             for fname in sorted(image_files):
                 num_slices = self._get_metadata(fname)
-
+                cat = _cat(fname)
                 self.image_examples += [
-                    (fname, slice_ind) for slice_ind in range(num_slices)
+                    (fname, slice_ind, cat) for slice_ind in range(num_slices)
                 ]
 
         kspace_files = list(Path(root / "kspace").iterdir())
         for fname in sorted(kspace_files):
             num_slices = self._get_metadata(fname)
-
+            cat = _cat(fname)
             self.kspace_examples += [
-                (fname, slice_ind) for slice_ind in range(num_slices)
+                (fname, slice_ind, cat) for slice_ind in range(num_slices)
             ]
 
 
@@ -45,8 +51,8 @@ class SliceData(Dataset):
 
     def __getitem__(self, i):
         if not self.forward:
-            image_fname, _ = self.image_examples[i]
-        kspace_fname, dataslice = self.kspace_examples[i]
+            image_fname, _, cat = self.image_examples[i]
+        kspace_fname, dataslice, cat = self.kspace_examples[i]
         if not self.forward and image_fname.name != kspace_fname.name:
             raise ValueError(f"Image file {image_fname.name} does not match kspace file {kspace_fname.name}")
 
@@ -61,7 +67,7 @@ class SliceData(Dataset):
                 target = hf[self.target_key][dataslice]
                 attrs = dict(hf.attrs)
             
-        return self.transform(mask, input, target, attrs, kspace_fname.name, dataslice)
+        return self.transform(mask, input, target, attrs, kspace_fname.name, dataslice, cat)
 
 
 def create_data_loaders(data_path, args, shuffle=False, isforward=False):

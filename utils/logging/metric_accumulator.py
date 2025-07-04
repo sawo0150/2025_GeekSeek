@@ -26,16 +26,17 @@ class MetricAccumulator:
         self.data = {c: defaultdict(float) for c in _CATS}
         self.total = defaultdict(float)
 
-    def update(self, loss: float, ssim: float, fnames):
-        # fnames: list[str] (배치 단위, 하나만 넘어와도 OK)
-        for f in fnames:
-            cat = _cat_from_fname(f)
-            self.data[cat]["loss"] += loss
-            self.data[cat]["ssim"] += ssim
-            self.data[cat]["n"]   += 1
-            self.total["loss"] += loss
-            self.total["ssim"] += ssim
-            self.total["n"] += 1
+    def update(self, loss: float, ssim: cats):
+        """
+        cats : list[str]  ex) ["knee_x4", "knee_x4", ...]  (배치 단위)
+        """
+        if not isinstance(cats, (list, tuple)):
+            cats = [cats]
+        for cat in cats:
+            d = self.data[cat]
+            d["loss"] += loss
+            d["ssim"] += ssim
+            d["n"]    += 1
 
     def _avg(self, d):
         return d["loss"]/d["n"], d["ssim"]/d["n"]
@@ -43,6 +44,8 @@ class MetricAccumulator:
     def log(self, step: int):
         if not wandb.run:  # W&B off
             return
+        if self.total["n"] == 0:          # ← 추가
+            return                       # 업데이트 안됐으면 그냥 skip
         logdict = {}
         for cat, d in self.data.items():
             if d["n"] == 0:   # 해당 카테고리 샘플 X

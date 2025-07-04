@@ -40,7 +40,7 @@ def train_epoch(args, epoch, model, data_loader, optimizer, loss_type, metricLog
     for iter, data in pbar:
 
     # for iter, data in enumerate(data_loader):
-        mask, kspace, target, maximum, fname, _ = data
+        mask, kspace, target, maximum, fnames, _, cats = data
         mask = mask.cuda(non_blocking=True)
         kspace = kspace.cuda(non_blocking=True)
         target = target.cuda(non_blocking=True)
@@ -60,7 +60,7 @@ def train_epoch(args, epoch, model, data_loader, optimizer, loss_type, metricLog
         pbar.set_postfix(loss=f"{loss.item():.4g}")
 
         # --- 카테고리별 누적 ---------------------------------------------
-        metricLog_train.update(loss_val, 1 - loss_val, fname)
+        metricLog_train.update(loss_val, 1 - loss_val, cats)
     # total_loss = total_loss / len_loader
     # return total_loss, time.perf_counter() - start_epoch
 
@@ -76,7 +76,7 @@ def validate(args, model, data_loader, acc_val, epoch):
 
     with torch.no_grad():
         for idx, data in enumerate(data_loader):
-            mask, kspace, target, _, fnames, slices = data
+            mask, kspace, target, _, fnames, slices, cats = data
             kspace = kspace.cuda(non_blocking=True)
             mask = mask.cuda(non_blocking=True)
             output = model(kspace, mask)
@@ -88,7 +88,7 @@ def validate(args, model, data_loader, acc_val, epoch):
                 # ---- 스칼라 누적 -----------------------------------------
                 loss_i  = ssim_loss(target[i].numpy(),
                                     output[i].cpu().numpy())
-                acc_val.update(loss_i, 1 - loss_i, fnames[i])
+                acc_val.update(loss_i, 1 - loss_i, [cats[i]])
 
     for fname in reconstructions:
         reconstructions[fname] = np.stack(
