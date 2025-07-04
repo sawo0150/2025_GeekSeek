@@ -18,6 +18,7 @@ from torchvision.utils import make_grid
 from collections import defaultdict
 from utils.data.load_data import create_data_loaders
 from utils.logging.metric_accumulator import MetricAccumulator
+from utils.logging.vis_logger import log_epoch_samples
 from utils.common.utils import save_reconstructions, ssim_loss
 from utils.common.loss_function import SSIMLoss
 from utils.model.varnet import VarNet
@@ -159,19 +160,16 @@ def train(args):
         train_loss, train_time = train_epoch(args, epoch, model,
                                              train_loader, optimizer,
                                              loss_type, MetricLog_train)
-        val_loss_raw, num_subjects, reconstructions, targets, inputs, val_time = validate(args, model, val_loader,
+        val_loss, num_subjects, reconstructions, targets, inputs, val_time = validate(args, model, val_loader,
                                                                                             MetricLog_val, epoch)
-        # SSIMLoss→SSIM 으로 변환 (1-loss)
-        val_ssim = 1 - (val_loss_raw / num_subjects)
-        val_loss_scalar = (val_loss_raw / num_subjects).item()
-        val_loss_log = np.append(val_loss_log, np.array([[epoch, val_loss_scalar]]), axis=0)
 
+        val_loss_log = np.append(val_loss_log, np.array([[epoch, val_loss]]), axis=0)
         file_path = os.path.join(args.val_loss_dir, "val_loss_log")
         np.save(file_path, val_loss_log)
         print(f"loss file saved! {file_path}")
 
-        # train_loss = torch.tensor(train_loss).cuda(non_blocking=True)
-        val_loss = torch.tensor(val_loss_scalar).cuda(non_blocking=True)
+        train_loss = torch.tensor(train_loss).cuda(non_blocking=True)
+        val_loss = torch.tensor(val_loss).cuda(non_blocking=True)
         num_subjects = torch.tensor(num_subjects).cuda(non_blocking=True)
 
         val_loss = val_loss / num_subjects
@@ -187,10 +185,15 @@ def train(args):
             MetricLog_train.log(epoch)
             MetricLog_val.log(epoch)
             # 추가 전역 정보(learning-rate 등)만 개별로 저장
+            log_epoch_samples(reconstructions, targets,
+                            step=epoch,
+                            max_per_cat=args.max_vis_per_cat)   # ← config 값 사용
+            
             wandb.log({"epoch": epoch,
                        "lr": optimizer.param_groups[0]['lr']}, step=epoch)
             if is_new_best:
                 wandb.save(str(args.exp_dir / "best_model.pt"))
+
                                 
         print(
             f'Epoch = [{epoch:4d}/{args.num_epochs:4d}] TrainLoss = {train_loss:.4g} '

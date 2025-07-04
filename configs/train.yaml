@@ -19,3 +19,5 @@ max_key:    max
 wandb:
   project: fastmri-2025
   entity: swpants05-seoul-national-university        # W&B 팀/계정
+  use_wandb: true           # false 이면 모든 wandb 로그 함수가 noop
+  max_vis_per_cat: 1        # epoch 마다 카테고리별 이미지 수 (0 → 안 올림)
