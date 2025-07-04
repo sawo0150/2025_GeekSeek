@@ -74,8 +74,16 @@ def validate(args, model, data_loader, acc_val, epoch):
     targets = defaultdict(dict)
     start = time.perf_counter()
 
+    
+    len_loader = len(data_loader)                 # ← 전체 길이
+    pbar = tqdm(enumerate(data_loader),           # ← tqdm 래퍼
+                total=len_loader,
+                ncols=70,
+                leave=False,
+                desc=f"Val  [{epoch:2d}/{args.num_epochs}]")
+    
     with torch.no_grad():
-        for idx, data in enumerate(data_loader):
+        for idx, data in pbar:
             mask, kspace, target, _, fnames, slices, cats = data
             kspace = kspace.cuda(non_blocking=True)
             mask = mask.cuda(non_blocking=True)

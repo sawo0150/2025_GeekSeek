@@ -26,7 +26,7 @@ class MetricAccumulator:
         self.data = {c: defaultdict(float) for c in _CATS}
         self.total = defaultdict(float)
 
-    def update(self, loss: float, ssim: cats):
+    def update(self, loss: float, ssim: float, cats):
         """
         cats : list[str]  ex) ["knee_x4", "knee_x4", ...]  (배치 단위)
         """
@@ -37,6 +37,10 @@ class MetricAccumulator:
             d["loss"] += loss
             d["ssim"] += ssim
             d["n"]    += 1
+        dt = self.total
+        dt["loss"] += loss
+        dt["ssim"] += ssim
+        dt["n"]    += 1
 
     def _avg(self, d):
         return d["loss"]/d["n"], d["ssim"]/d["n"]
