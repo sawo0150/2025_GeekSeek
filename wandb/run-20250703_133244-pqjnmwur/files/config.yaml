@@ -1,0 +1,88 @@
+_wandb:
+    value:
+        cli_version: 0.21.0
+        e:
+            wfk9d4xighstjse4cvyhc6nm75qh1xss:
+                codePath: main.py
+                codePathLocal: main.py
+                cpu_count: 8
+                cpu_count_logical: 16
+                cudaVersion: "12.4"
+                disk:
+                    /:
+                        total: "982818799616"
+                        used: "617421795328"
+                email: swpants05@snu.ac.kr
+                executable: /home/swpants05/.pyenv/versions/3.11.4/bin/python3
+                git:
+                    commit: 8116946737ae8cb94cc49976f2c8cd40ec6e240f
+                    remote: git@github.com:sawo0150/2025_GeekSeek.git
+                gpu: NVIDIA GeForce RTX 4070 SUPER
+                gpu_count: 1
+                gpu_nvidia:
+                    - architecture: Ada
+                      cudaCores: 7168
+                      memoryTotal: "12878610432"
+                      name: NVIDIA GeForce RTX 4070 SUPER
+                      uuid: GPU-15ce3daf-aa6f-fd1c-9624-e83615081790
+                host: swpants05-desktop
+                memory:
+                    total: "67340546048"
+                os: Linux-6.8.0-58-generic-x86_64-with-glibc2.35
+                program: /home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/main.py
+                python: CPython 3.11.4
+                root: /home/swpants05/Desktop/2025_FastMri/2025_GeekSeek
+                startedAt: "2025-07-03T04:32:44.392640Z"
+                writerId: wfk9d4xighstjse4cvyhc6nm75qh1xss
+        m: []
+        python_version: 3.11.4
+        t:
+            "1":
+                - 1
+                - 41
+                - 50
+            "2":
+                - 1
+                - 41
+                - 50
+            "3":
+                - 13
+                - 16
+                - 61
+            "4": 3.11.4
+            "5": 0.21.0
+            "12": 0.21.0
+            "13": linux-x86_64
+GPU_NUM:
+    value: 0
+batch_size:
+    value: 1
+data:
+    value:
+        PROJECT_ROOT: /home/swpants05/Desktop/2025_FastMri/
+        data_path_train: /home/swpants05/Desktop/2025_FastMri/Data/train/
+        data_path_val: /home/swpants05/Desktop/2025_FastMri/Data/val/
+input_key:
+    value: kspace
+lr:
+    value: 0.001
+max_key:
+    value: max
+model:
+    value:
+        cascade: 1
+        chans: 9
+        net_name: varnet_small
+        sens_chans: 4
+num_epochs:
+    value: 5
+report_interval:
+    value: 500
+seed:
+    value: 430
+target_key:
+    value: image_label
+wandb:
+    value:
+        entity: swpants05-seoul-national-university
+        project: fastmri-2025

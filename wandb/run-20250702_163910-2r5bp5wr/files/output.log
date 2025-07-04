@@ -14,3 +14,67 @@ Epoch = [  0/  5] Iter = [3000/4937] Loss = 0.1321 Time = 74.7219s
 Epoch = [  0/  5] Iter = [3500/4937] Loss = 0.1079 Time = 74.0398s
 Epoch = [  0/  5] Iter = [4000/4937] Loss = 0.05587 Time = 75.8786s
 Epoch = [  0/  5] Iter = [4500/4937] Loss = 0.07412 Time = 74.8265s
+loss file saved! /home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/result/varnet_small/val_loss_log
+Epoch = [   0/   5] TrainLoss = 0.134 ValLoss = 0.1361 TrainTime = 748.4579s ValTime = 76.1632s
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@NewRecord@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+ForwardTime = 0.5583s
+Epoch # 1 ............... varnet_small ...............
+Epoch = [  1/  5] Iter = [   0/4937] Loss = 0.1041 Time = 0.2245s
+Epoch = [  1/  5] Iter = [ 500/4937] Loss = 0.1709 Time = 75.9809s
+Epoch = [  1/  5] Iter = [1000/4937] Loss = 0.09558 Time = 73.7605s
+Epoch = [  1/  5] Iter = [1500/4937] Loss = 0.0687 Time = 71.4419s
+Epoch = [  1/  5] Iter = [2000/4937] Loss = 0.05065 Time = 74.1413s
+Epoch = [  1/  5] Iter = [2500/4937] Loss = 0.05593 Time = 73.0199s
+Epoch = [  1/  5] Iter = [3000/4937] Loss = 0.07456 Time = 73.6106s
+Epoch = [  1/  5] Iter = [3500/4937] Loss = 0.09852 Time = 74.6055s
+Epoch = [  1/  5] Iter = [4000/4937] Loss = 0.04351 Time = 76.1643s
+Epoch = [  1/  5] Iter = [4500/4937] Loss = 0.05614 Time = 74.7696s
+loss file saved! /home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/result/varnet_small/val_loss_log
+Epoch = [   1/   5] TrainLoss = 0.1071 ValLoss = 0.1241 TrainTime = 733.2057s ValTime = 74.2076s
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@NewRecord@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+ForwardTime = 0.8974s
+Epoch # 2 ............... varnet_small ...............
+Epoch = [  2/  5] Iter = [   0/4937] Loss = 0.1826 Time = 0.1281s
+Epoch = [  2/  5] Iter = [ 500/4937] Loss = 0.04659 Time = 72.8829s
+Epoch = [  2/  5] Iter = [1000/4937] Loss = 0.1083 Time = 74.3377s
+Epoch = [  2/  5] Iter = [1500/4937] Loss = 0.05389 Time = 73.3618s
+Epoch = [  2/  5] Iter = [2000/4937] Loss = 0.0692 Time = 74.2091s
+Epoch = [  2/  5] Iter = [2500/4937] Loss = 0.1416 Time = 74.8179s
+Epoch = [  2/  5] Iter = [3000/4937] Loss = 0.1347 Time = 73.1267s
+Epoch = [  2/  5] Iter = [3500/4937] Loss = 0.0717 Time = 74.9810s
+Epoch = [  2/  5] Iter = [4000/4937] Loss = 0.07132 Time = 73.3692s
+Epoch = [  2/  5] Iter = [4500/4937] Loss = 0.1441 Time = 74.3702s
+loss file saved! /home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/result/varnet_small/val_loss_log
+Epoch = [   2/   5] TrainLoss = 0.09794 ValLoss = 0.1218 TrainTime = 730.5571s ValTime = 72.3248s
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@NewRecord@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+ForwardTime = 0.8141s
+Epoch # 3 ............... varnet_small ...............
+Epoch = [  3/  5] Iter = [   0/4937] Loss = 0.1567 Time = 0.1283s
+Epoch = [  3/  5] Iter = [ 500/4937] Loss = 0.1843 Time = 72.4941s
+Epoch = [  3/  5] Iter = [1000/4937] Loss = 0.1105 Time = 71.7524s
+Epoch = [  3/  5] Iter = [1500/4937] Loss = 0.05266 Time = 74.7985s
+Epoch = [  3/  5] Iter = [2000/4937] Loss = 0.05051 Time = 74.0356s
+Epoch = [  3/  5] Iter = [2500/4937] Loss = 0.04662 Time = 73.2254s
+Epoch = [  3/  5] Iter = [3000/4937] Loss = 0.07619 Time = 74.0075s
+Epoch = [  3/  5] Iter = [3500/4937] Loss = 0.08705 Time = 72.2210s
+Epoch = [  3/  5] Iter = [4000/4937] Loss = 0.05713 Time = 72.0692s
+Epoch = [  3/  5] Iter = [4500/4937] Loss = 0.1215 Time = 73.0446s
+loss file saved! /home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/result/varnet_small/val_loss_log
+Epoch = [   3/   5] TrainLoss = 0.09349 ValLoss = 0.115 TrainTime = 721.4157s ValTime = 72.4375s
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@NewRecord@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+ForwardTime = 0.9056s
+Epoch # 4 ............... varnet_small ...............
+Epoch = [  4/  5] Iter = [   0/4937] Loss = 0.08279 Time = 0.1339s
+Epoch = [  4/  5] Iter = [ 500/4937] Loss = 0.1832 Time = 72.4578s
+Epoch = [  4/  5] Iter = [1000/4937] Loss = 0.04889 Time = 71.7398s
+Epoch = [  4/  5] Iter = [1500/4937] Loss = 0.06525 Time = 72.4836s
+Epoch = [  4/  5] Iter = [2000/4937] Loss = 0.1308 Time = 72.3541s
+Epoch = [  4/  5] Iter = [2500/4937] Loss = 0.05994 Time = 73.8654s
+Epoch = [  4/  5] Iter = [3000/4937] Loss = 0.07069 Time = 73.9015s
+Epoch = [  4/  5] Iter = [3500/4937] Loss = 0.05949 Time = 75.0817s
+Epoch = [  4/  5] Iter = [4000/4937] Loss = 0.08083 Time = 71.5460s
+Epoch = [  4/  5] Iter = [4500/4937] Loss = 0.03149 Time = 72.3097s
+loss file saved! /home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/result/varnet_small/val_loss_log
+Epoch = [   4/   5] TrainLoss = 0.09014 ValLoss = 0.1124 TrainTime = 720.3203s ValTime = 72.1360s
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@NewRecord@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+ForwardTime = 0.9017s

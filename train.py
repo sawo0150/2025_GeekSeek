@@ -51,4 +51,6 @@ if __name__ == '__main__':
     args.exp_dir.mkdir(parents=True, exist_ok=True)
     args.val_dir.mkdir(parents=True, exist_ok=True)
 
+    args.use_wandb = False
+
     train(args)

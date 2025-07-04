@@ -1,0 +1,20 @@
+Current cuda device:  0
+/home/swpants05/Desktop/2025_FastMri/Data/train
+/home/swpants05/Desktop/2025_FastMri/Data/val
+Epoch # 0 ............... varnet_small ...............
+Epoch[ 0/5]/:   0%|                                                                            | 0/4937 [00:00<?, ?it/s]/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/model/varnet.py:286: UserWarning: where received a uint8 condition tensor. This behavior is deprecated and will be removed in a future version of PyTorch. Use a boolean condition instead. (Triggered internally at /pytorch/aten/src/ATen/native/TensorCompare.cpp:611.)
+  soft_dc = torch.where(mask, current_kspace - ref_kspace, zero) * self.dc_weight
+Error executing job with overrides: []                                                                                  
+Traceback (most recent call last):
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/main.py", line 82, in main
+    train(args)   # utils.learning.train_part.train 호출 :contentReference[oaicite:2]{index=2}
+    ^^^^^^^^^^^
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/learning/train_part.py", line 165, in train
+    (val_loss_raw, num_subjects, reconstructions, targets, sample_grid, val_time) = validate(args, model, val_loader)
+                                                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/learning/train_part.py", line 112, in validate
+    first = next(iter(reconstructions))
+                 ^^^^^^^^^^^^^^^^^^^^^
+TypeError: 'int' object is not callable
+
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
