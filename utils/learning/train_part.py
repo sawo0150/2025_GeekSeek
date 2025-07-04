@@ -17,13 +17,14 @@ from torchvision.utils import make_grid
 
 from collections import defaultdict
 from utils.data.load_data import create_data_loaders
+from utils.logging.metric_accumulator import MetricAccumulator
 from utils.common.utils import save_reconstructions, ssim_loss
 from utils.common.loss_function import SSIMLoss
 from utils.model.varnet import VarNet
 
 import os
 
-def train_epoch(args, epoch, model, data_loader, optimizer, loss_type):
+def train_epoch(args, epoch, model, data_loader, optimizer, loss_type, metricLog_train):
     model.train()
     # start_epoch = start_iter = time.perf_counter()
     len_loader = len(data_loader)
@@ -31,7 +32,7 @@ def train_epoch(args, epoch, model, data_loader, optimizer, loss_type):
 
     pbar = tqdm(enumerate(data_loader),
                 total=len_loader,
-                ncols=120,
+                ncols=70,
                 leave=False,
                 desc=f"Epoch[{epoch:2d}/{args.num_epochs}]/")
 
@@ -39,7 +40,7 @@ def train_epoch(args, epoch, model, data_loader, optimizer, loss_type):
     for iter, data in pbar:
 
     # for iter, data in enumerate(data_loader):
-        mask, kspace, target, maximum, _, _ = data
+        mask, kspace, target, maximum, fname, _ = data
         mask = mask.cuda(non_blocking=True)
         kspace = kspace.cuda(non_blocking=True)
         target = target.cuda(non_blocking=True)
@@ -50,27 +51,16 @@ def train_epoch(args, epoch, model, data_loader, optimizer, loss_type):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        total_loss += loss.item()
-
-        # if iter % args.report_interval == 0:
-        #     print(
-        #         f'Epoch = [{epoch:3d}/{args.num_epochs:3d}] '
-        #         f'Iter = [{iter:4d}/{len(data_loader):4d}] '
-        #         f'Loss = {loss.item():.4g} '
-        #         f'Time = {time.perf_counter() - start_iter:.4f}s',
-        #     )
-        #     start_iter = time.perf_counter()
+        
+        loss_val = loss.item()
+        total_loss += loss_val
 
         # --- tqdm & ETA ---------------------------------------------------
         avg = (time.perf_counter() - start_iter) / (iter + 1)
         pbar.set_postfix(loss=f"{loss.item():.4g}")
-                        #  eta=f"{(len_loader - iter - 1) * avg/60:5.1f}m")
 
-        # --- 배치 스칼라 W&B 로깅 -----------------------------------------
-        if getattr(args, "use_wandb", False) and wandb:
-            wandb.log({"train_loss": loss.item(),
-                       "lr": optimizer.param_groups[0]['lr']},
-                      step=epoch * len_loader + iter)
+        # --- 카테고리별 누적 ---------------------------------------------
+        metricLog_train.update(loss_val, 1 - loss_val, fname)
     # total_loss = total_loss / len_loader
     # return total_loss, time.perf_counter() - start_epoch
 
@@ -78,7 +68,7 @@ def train_epoch(args, epoch, model, data_loader, optimizer, loss_type):
     return total_loss / len_loader, epoch_time
 
 
-def validate(args, model, data_loader):
+def validate(args, model, data_loader, acc_val, epoch):
     model.eval()
     reconstructions = defaultdict(dict)
     targets = defaultdict(dict)
@@ -91,9 +81,14 @@ def validate(args, model, data_loader):
             mask = mask.cuda(non_blocking=True)
             output = model(kspace, mask)
 
-            for i in range(output.shape[0]):
+            for i in range(output.shape[0]):    # validate Batch 개수 고려해서 for로 묶었는듯
                 reconstructions[fnames[i]][int(slices[i])] = output[i].cpu().numpy()
                 targets[fnames[i]][int(slices[i])] = target[i].numpy()
+                
+                # ---- 스칼라 누적 -----------------------------------------
+                loss_i  = ssim_loss(target[i].numpy(),
+                                    output[i].cpu().numpy())
+                acc_val.update(loss_i, 1 - loss_i, fnames[i])
 
     for fname in reconstructions:
         reconstructions[fname] = np.stack(
@@ -105,18 +100,9 @@ def validate(args, model, data_loader):
         )
     metric_loss = sum([ssim_loss(targets[fname], reconstructions[fname]) for fname in reconstructions])
     num_subjects = len(reconstructions)
-    # return metric_loss, num_subjects, reconstructions, targets, None, time.perf_counter() - start
-    # --- 샘플 이미지 (첫 파일 첫 슬라이스) ------------------------------
-    sample_grid: Optional[torch.Tensor] = None
-    if reconstructions:
-        first = next(iter(reconstructions))
-        recon = torch.from_numpy(reconstructions[first][0]).unsqueeze(0)
-        target = torch.from_numpy(targets[first][0]).unsqueeze(0)
-        sample_grid = make_grid(torch.cat([recon, target], 0),
-                                nrow=2, normalize=True)
-    return (metric_loss, num_subjects,
-            reconstructions, targets, None, sample_grid,
-            time.perf_counter() - start)
+    
+
+    return metric_loss, num_subjects, reconstructions, targets, None, time.perf_counter() - start
 
 def save_model(args, exp_dir, epoch, model, optimizer, best_val_loss, is_new_best):
     torch.save(
@@ -158,12 +144,15 @@ def train(args):
     val_loss_log = np.empty((0, 2))
 
     for epoch in range(start_epoch, args.num_epochs):
+        MetricLog_train = MetricAccumulator("train")
+        MetricLog_val   = MetricAccumulator("val")
         print(f'Epoch #{epoch:2d} ............... {args.net_name} ...............')
-        
-        # train_loss, train_time = train_epoch(args, epoch, model, train_loader, optimizer, loss_type)
-        # val_loss, num_subjects, reconstructions, targets, inputs, val_time = validate(args, model, val_loader)
-        (val_loss_raw, num_subjects, reconstructions, targets,inputs, sample_grid, val_time) = validate(args, model, val_loader)
 
+        train_loss, train_time = train_epoch(args, epoch, model,
+                                             train_loader, optimizer,
+                                             loss_type, MetricLog_train)
+        val_loss_raw, num_subjects, reconstructions, targets, inputs, val_time = validate(args, model, val_loader,
+                                                                                            MetricLog_val, epoch)
         # SSIMLoss→SSIM 으로 변환 (1-loss)
         val_ssim = 1 - (val_loss_raw / num_subjects)
         val_loss_scalar = (val_loss_raw / num_subjects).item()
@@ -184,24 +173,20 @@ def train(args):
 
         save_model(args, args.exp_dir, epoch + 1, model, optimizer, best_val_loss, is_new_best)
         
-        # ---------------- W&B 에폭 로그 ----------------
+       
+        # ---------------- W&B 에폭 로그 (카테고리별) ----------------
         if getattr(args, "use_wandb", False) and wandb:
+            MetricLog_train.log(epoch)
+            MetricLog_val.log(epoch)
+            # 추가 전역 정보(learning-rate 등)만 개별로 저장
             wandb.log({"epoch": epoch,
-                    #    "train_loss": train_loss,
-                       "val_loss": val_loss.item(),
-                       "val_ssim": val_ssim.item(),
-                       "lr": optimizer.param_groups[0]['lr']})
-            # if sample_grid is not None:
-            #     wandb.log({"recon_sample":
-            #                wandb.Image(sample_grid,
-            #                            caption=f"epoch{epoch}")})
+                       "lr": optimizer.param_groups[0]['lr']}, step=epoch)
             if is_new_best:
-                # best 모델 아티팩트 업로드
                 wandb.save(str(args.exp_dir / "best_model.pt"))
                                 
         print(
-            # f'Epoch = [{epoch:4d}/{args.num_epochs:4d}] TrainLoss = {train_loss:.4g} '
-            # f'ValLoss = {val_loss:.4g} TrainTime = {train_time:.4f}s ValTime = {val_time:.4f}s',
+            f'Epoch = [{epoch:4d}/{args.num_epochs:4d}] TrainLoss = {train_loss:.4g} '
+            f'ValLoss = {val_loss:.4g} TrainTime = {train_time:.4f}s ValTime = {val_time:.4f}s',
         )
 
         if is_new_best:
