@@ -40,7 +40,7 @@ def _flatten_cfg_to_args(cfg: DictConfig) -> SimpleNamespace:
     # 3) train_part.py가 기대하는 대문자 필드를 맞춰줌
     args.GPU_NUM = flat["GPU_NUM"]
     args.use_wandb = cfg.wandb.use_wandb
-    args.max_vis_per_cat = args.wandb.max_vis_per_cat   # epoch 마다 카테고리별 이미지 수 (0 → 안 올림)
+    args.max_vis_per_cat = cfg.wandb.max_vis_per_cat   # epoch 마다 카테고리별 이미지 수 (0 → 안 올림)
 
     # 4) Path 변환: data_path_* 를 Path 객체로 변경하여 load_data 에서의 '/' 연산 오류 방지
     if hasattr(args, 'data_path_train'):
