@@ -16,6 +16,7 @@ from tqdm import tqdm
 from torchvision.utils import make_grid
 from hydra.utils import instantiate          # ★ NEW
 from omegaconf import OmegaConf              # ★ NEW
+from torchmetrics.image.ssim import StructuralSimilarityIndexMeasure  # ★ NEW
 
 from collections import defaultdict
 from utils.data.load_data import create_data_loaders
@@ -27,7 +28,7 @@ from utils.model.varnet import VarNet
 
 import os
 
-def train_epoch(args, epoch, model, data_loader, optimizer, loss_type, metricLog_train):
+def train_epoch(args, epoch, model, data_loader, optimizer, loss_type,ssim_metric, metricLog_train):
     model.train()
     # start_epoch = start_iter = time.perf_counter()
     len_loader = len(data_loader)
@@ -55,6 +56,14 @@ def train_epoch(args, epoch, model, data_loader, optimizer, loss_type, metricLog
         loss.backward()
         optimizer.step()
         
+        # -------- SSIM Metric (no grad) ----------------------------------
+        with torch.no_grad():
+            ssim_val = ssim_metric(
+                output.detach().float().clamp(0, 1),
+                target.float().clamp(0, 1)
+            ).item()
+            ssim_metric.reset()
+
         loss_val = loss.item()
         total_loss += loss_val
 
@@ -63,7 +72,7 @@ def train_epoch(args, epoch, model, data_loader, optimizer, loss_type, metricLog
         pbar.set_postfix(loss=f"{loss.item():.4g}")
 
         # --- 카테고리별 누적 ---------------------------------------------
-        metricLog_train.update(loss_val, 1 - loss_val, cats)
+        metricLog_train.update(loss_val, ssim_val, cats)
     # total_loss = total_loss / len_loader
     # return total_loss, time.perf_counter() - start_epoch
 
@@ -104,15 +113,15 @@ def validate(args, model, data_loader, acc_val, epoch):
                 n_slices   += 1
                 acc_val.update(loss_i, 1 - loss_i, [cats[i]])
 
+    for fname in reconstructions:
+        reconstructions[fname] = np.stack(
+            [out for _, out in sorted(reconstructions[fname].items())]
+        )
+    for fname in targets:
+        targets[fname] = np.stack(
+            [out for _, out in sorted(targets[fname].items())]
+        )
     # 기존 validate 방식 : subject 별 평균값의 평균값 (leaderboard랑 평가 방식이 다름)
-    # for fname in reconstructions:
-    #     reconstructions[fname] = np.stack(
-    #         [out for _, out in sorted(reconstructions[fname].items())]
-    #     )
-    # for fname in targets:
-    #     targets[fname] = np.stack(
-    #         [out for _, out in sorted(targets[fname].items())]
-    #     )
     # metric_loss = sum([ssim_loss(targets[fname], reconstructions[fname]) for fname in reconstructions])
     # num_subjects = len(reconstructions)
     
@@ -148,10 +157,18 @@ def train(args):
     model.to(device=device)
 
     loss_type = SSIMLoss().to(device=device)
+    loss_cfg = getattr(args, "LossFunction", {"_target_": "utils.common.loss_function.SSIMLoss"})
+    loss_type = instantiate(OmegaConf.create(loss_cfg)).to(device=device)
+
+    # 3️⃣ SSIM 메트릭 (로깅 전용) --------------------------------------------------
+    ssim_metric = StructuralSimilarityIndexMeasure(data_range=1.0).to(device)
+
     optimizer = torch.optim.Adam(model.parameters(), args.lr)
 
+    print(f"[Hydra] loss_func ▶ {loss_type}")      # 디버그
+
     # ──────────────── LR Scheduler (옵션) ────────────────
-    scheduler_cfg = getattr(args, "scheduler", None)   # flatten 단계에서 dict 로 들어옴
+    scheduler_cfg = getattr(args, "LRscheduler", None)   # flatten 단계에서 dict 로 들어옴
     if scheduler_cfg is not None:
         # dict → OmegaConf 로 감싸야 instantiate 가 제대로 동작
         scheduler = instantiate(OmegaConf.create(scheduler_cfg),
@@ -177,7 +194,7 @@ def train(args):
 
         train_loss, train_time = train_epoch(args, epoch, model,
                                              train_loader, optimizer,
-                                             loss_type, MetricLog_train)
+                                             loss_type, ssim_metric, MetricLog_train)
         val_loss, num_subjects, reconstructions, targets, inputs, val_time = validate(args, model, val_loader,
                                                                                             MetricLog_val, epoch)
 
