@@ -14,6 +14,8 @@ except ModuleNotFoundError:
 
 from tqdm import tqdm
 from torchvision.utils import make_grid
+from hydra.utils import instantiate          # ★ NEW
+from omegaconf import OmegaConf              # ★ NEW
 
 from collections import defaultdict
 from utils.data.load_data import create_data_loaders
@@ -74,7 +76,8 @@ def validate(args, model, data_loader, acc_val, epoch):
     reconstructions = defaultdict(dict)
     targets = defaultdict(dict)
     start = time.perf_counter()
-
+    total_loss = 0.0
+    n_slices   = 0
     
     len_loader = len(data_loader)                 # ← 전체 길이
     pbar = tqdm(enumerate(data_loader),           # ← tqdm 래퍼
@@ -97,21 +100,26 @@ def validate(args, model, data_loader, acc_val, epoch):
                 # ---- 스칼라 누적 -----------------------------------------
                 loss_i  = ssim_loss(target[i].numpy(),
                                     output[i].cpu().numpy())
+                total_loss += loss_i
+                n_slices   += 1
                 acc_val.update(loss_i, 1 - loss_i, [cats[i]])
 
-    for fname in reconstructions:
-        reconstructions[fname] = np.stack(
-            [out for _, out in sorted(reconstructions[fname].items())]
-        )
-    for fname in targets:
-        targets[fname] = np.stack(
-            [out for _, out in sorted(targets[fname].items())]
-        )
-    metric_loss = sum([ssim_loss(targets[fname], reconstructions[fname]) for fname in reconstructions])
-    num_subjects = len(reconstructions)
+    # 기존 validate 방식 : subject 별 평균값의 평균값 (leaderboard랑 평가 방식이 다름)
+    # for fname in reconstructions:
+    #     reconstructions[fname] = np.stack(
+    #         [out for _, out in sorted(reconstructions[fname].items())]
+    #     )
+    # for fname in targets:
+    #     targets[fname] = np.stack(
+    #         [out for _, out in sorted(targets[fname].items())]
+    #     )
+    # metric_loss = sum([ssim_loss(targets[fname], reconstructions[fname]) for fname in reconstructions])
+    # num_subjects = len(reconstructions)
+    
+    metric_loss = total_loss / n_slices        # ← leaderboard 방식 (Slice 별 평균)
     
 
-    return metric_loss, num_subjects, reconstructions, targets, None, time.perf_counter() - start
+    return metric_loss, n_slices, reconstructions, targets, None, time.perf_counter() - start
 
 def save_model(args, exp_dir, epoch, model, optimizer, best_val_loss, is_new_best):
     torch.save(
@@ -141,6 +149,16 @@ def train(args):
 
     loss_type = SSIMLoss().to(device=device)
     optimizer = torch.optim.Adam(model.parameters(), args.lr)
+
+    # ──────────────── LR Scheduler (옵션) ────────────────
+    scheduler_cfg = getattr(args, "scheduler", None)   # flatten 단계에서 dict 로 들어옴
+    if scheduler_cfg is not None:
+        # dict → OmegaConf 로 감싸야 instantiate 가 제대로 동작
+        scheduler = instantiate(OmegaConf.create(scheduler_cfg),
+                                optimizer=optimizer)
+        print(f"[Hydra] Scheduler ▶ {scheduler}")      # 디버그
+    else:
+        scheduler = None
 
     best_val_loss = 1.
     start_epoch = 0
@@ -179,7 +197,14 @@ def train(args):
 
         save_model(args, args.exp_dir, epoch + 1, model, optimizer, best_val_loss, is_new_best)
         
-       
+        # ──────────── LR 스케줄러 업데이트 ────────────
+        if scheduler is not None:
+            # ReduceLROnPlateau 는 val_metric 이 필요함
+            if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+                scheduler.step(val_loss)      # 여기서는 “낮을수록 좋음” metric
+            else:
+                scheduler.step()
+
         # ---------------- W&B 에폭 로그 (카테고리별) ----------------
         if getattr(args, "use_wandb", False) and wandb:
             MetricLog_train.log(epoch)

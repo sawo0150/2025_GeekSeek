@@ -2,6 +2,7 @@ defaults:
   - _self_
   - model: varnet_small   # 모델 설정
   - data: local_sangwonDesktop           # 데이터 경로 설정
+  - scheduler: CosineAnnealingLR        # ⬅️  추가
 
 # === 공통 학습 하이퍼파라미터 ===
 GPU_NUM: 0
