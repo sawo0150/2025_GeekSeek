@@ -13,22 +13,27 @@ except ModuleNotFoundError:
     wandb = None
 
 from tqdm import tqdm
-from torchvision.utils import make_grid
 from hydra.utils import instantiate          # ★ NEW
 from omegaconf import OmegaConf              # ★ NEW
+from torchvision.utils import make_grid
 from torchmetrics.image.ssim import StructuralSimilarityIndexMeasure  # ★ NEW
+from torch.cuda.amp import GradScaler, autocast          # ★---
+from torch.nn import Module
 
 from collections import defaultdict
 from utils.data.load_data import create_data_loaders
 from utils.logging.metric_accumulator import MetricAccumulator
 from utils.logging.vis_logger import log_epoch_samples
-from utils.common.utils import save_reconstructions, ssim_loss
+from utils.common.utils import save_reconstructions, ssim_loss, ssim_loss_gpu
 from utils.common.loss_function import SSIMLoss
 from utils.model.varnet import VarNet
 
 import os
 
-def train_epoch(args, epoch, model, data_loader, optimizer, loss_type,ssim_metric, metricLog_train):
+# def train_epoch(args, epoch, model, data_loader, optimizer, loss_type,ssim_metric, metricLog_train):
+def train_epoch(args, epoch, model, data_loader, optimizer,
+                loss_type, metricLog_train,
+                scaler, amp_enabled, accum_steps):
     model.train()
     # start_epoch = start_iter = time.perf_counter()
     len_loader = len(data_loader)
@@ -48,33 +53,40 @@ def train_epoch(args, epoch, model, data_loader, optimizer, loss_type,ssim_metri
         mask = mask.cuda(non_blocking=True)
         kspace = kspace.cuda(non_blocking=True)
         target = target.cuda(non_blocking=True)
-        maximum = maximum.cuda(non_blocking=True)
+        maximum = maximum.cuda(non_blocking=True) # 슬라이스 max가 아니라 볼륨 전체 max임... (한 환자에 대해서..)
 
-        output = model(kspace, mask)
-        loss = loss_type(output, target, maximum)
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+        with autocast(enabled=amp_enabled):
+            output = model(kspace, mask)
+        current_loss   = loss_type(output, target, maximum)
+        loss = current_loss/accum_steps
+        # print("max alloc MB:", torch.cuda.max_memory_allocated() / 1024**2)
+        # ─── Accumulation ──────────────────────────────────────────────
+        if iter % accum_steps == 0:
+            optimizer.zero_grad(set_to_none=True)
+
+        if amp_enabled:
+            scaler.scale(loss).backward()
+        else:
+            loss.backward()
+        # step & update?
+        if (iter + 1) % accum_steps == 0 or (iter + 1) == len_loader:
+            if amp_enabled:
+                # unscale / clip_grad 등 필요 시 여기서
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                optimizer.step()
         
         # -------- SSIM Metric (no grad) ----------------------------------
         with torch.no_grad():
-            preds  = output.detach().float().clamp(0, 1)
-            target_ = target.float().clamp(0, 1)
+            ssim_val = 1 - ssim_loss_gpu(output.detach(), target, maximum).item()
 
-            # torchmetrics 입력은 (B,C,H,W) → 채널 축이 없으면 삽입
-            if preds.dim() == 3:      # (B,H,W)
-                preds  = preds.unsqueeze(1)        # (B,1,H,W)
-                target_ = target_.unsqueeze(1)
-
-            ssim_val = ssim_metric(preds, target_).item()
-            ssim_metric.reset()
-
-        loss_val = loss.item()
+        loss_val = current_loss.item()
         total_loss += loss_val
 
         # --- tqdm & ETA ---------------------------------------------------
         avg = (time.perf_counter() - start_iter) / (iter + 1)
-        pbar.set_postfix(loss=f"{loss.item():.4g}")
+        pbar.set_postfix(loss=f"{current_loss.item():.4g}")
 
         # --- 카테고리별 누적 ---------------------------------------------
         metricLog_train.update(loss_val, ssim_val, cats)
@@ -150,25 +162,38 @@ def save_model(args, exp_dir, epoch, model, optimizer, best_val_loss, is_new_bes
     if is_new_best:
         shutil.copyfile(exp_dir / 'model.pt', exp_dir / 'best_model.pt')
 
-        
 def train(args):
     device = torch.device(f'cuda:{args.GPU_NUM}' if torch.cuda.is_available() else 'cpu')
     torch.cuda.set_device(device)
     print('Current cuda device: ', torch.cuda.current_device())
 
-    model = VarNet(num_cascades=args.cascade, 
-                   chans=args.chans, 
-                   sens_chans=args.sens_chans)
-    model.to(device=device)
+    # ▸ 0. 옵션 파싱 (기본값 유지)
+    accum_steps   = getattr(args, "training_accum_steps",   1)
+    checkpointing = getattr(args, "training_checkpointing", False)
+    amp_enabled   = getattr(args, "training_amp",           False)
+
+    model = VarNet(num_cascades=args.cascade,
+                   chans=args.chans,
+                   sens_chans=args.sens_chans,
+                   use_checkpoint=checkpointing).to(device)    # ← Hydra 플래그 연결)
 
     loss_type = SSIMLoss().to(device=device)
     loss_cfg = getattr(args, "LossFunction", {"_target_": "utils.common.loss_function.SSIMLoss"})
     loss_type = instantiate(OmegaConf.create(loss_cfg)).to(device=device)
 
-    # 3️⃣ SSIM 메트릭 (로깅 전용) --------------------------------------------------
-    ssim_metric = StructuralSimilarityIndexMeasure(data_range=1.0).to(device)
+    # ── 1. Optimizer 선택 (fallback: Adam) ─────────────────────────────
+    optim_cfg = getattr(args, "optimizer", None)
+    if optim_cfg is not None:
+        optimizer = instantiate(
+            OmegaConf.create(optim_cfg),        # cfg → OmegaConf 객체
+            params=model.parameters()           # 추가 인자주입
+        )
+    else:                                       # 안전장치
+        optimizer = torch.optim.Adam(model.parameters(), args.lr)
+    print(f"[Hydra] Optimizer ▶ {optimizer.__class__.__name__}")
 
-    optimizer = torch.optim.Adam(model.parameters(), args.lr)
+    # ▸ 2. AMP scaler (옵션)
+    scaler = GradScaler(enabled=amp_enabled)
 
     print(f"[Hydra] loss_func ▶ {loss_type}")      # 디버그
 
@@ -199,7 +224,8 @@ def train(args):
 
         train_loss, train_time = train_epoch(args, epoch, model,
                                              train_loader, optimizer,
-                                             loss_type, ssim_metric, MetricLog_train)
+                                             loss_type, MetricLog_train,
+                                             scaler, amp_enabled, accum_steps)
         val_loss, num_subjects, reconstructions, targets, inputs, val_time = validate(args, model, val_loader,
                                                                                             MetricLog_val, epoch)
 
@@ -211,8 +237,6 @@ def train(args):
         train_loss = torch.tensor(train_loss).cuda(non_blocking=True)
         val_loss = torch.tensor(val_loss).cuda(non_blocking=True)
         num_subjects = torch.tensor(num_subjects).cuda(non_blocking=True)
-
-        # val_loss = val_loss / num_subjects
 
         is_new_best = val_loss < best_val_loss
         best_val_loss = min(best_val_loss, val_loss)

@@ -1,7 +1,9 @@
 # utils/logging/vis_logger.py
 import re, numpy as np, matplotlib.pyplot as plt, matplotlib as mpl
+from collections import defaultdict     # ★ 이 줄 추가
 try:
     import wandb          # 가급적 train 스크립트와 동일한 import 패턴
+    
 except ModuleNotFoundError:
     wandb = None
 
@@ -90,25 +92,26 @@ def make_figure(
 #   reconstructions, targets : validate() 가 반환한 dict[fname] = (S,H,W)
 #   max_per_cat              : 카테고리(knee_x4 등) 당 몇 장까지 올릴지
 # ---------------------------------------------------------------------
-def log_epoch_samples(reconstructions: dict,
-                      targets: dict,
-                      step: int,
-                      max_per_cat: int = 1):
+def log_epoch_samples(reconstructions, targets, step, max_per_cat=1):
     if not (wandb and wandb.run):
-        return                # wandb off → skip
+        return
 
-    sent_cnt = {}             # {"knee_x4": 1, ...}
+    buckets = defaultdict(list)     # {cat: [wandb.Image, …]}
+
     for fname, vol in reconstructions.items():
         cat = _cat_from_fname(fname)
-        if sent_cnt.get(cat, 0) >= max_per_cat:
-            continue          # quota 초과
-        # ─ 선택할 slice : 중앙 slice
+        if len(buckets[cat]) >= max_per_cat:
+            continue
+
         mid = vol.shape[0] // 2
-        recon = vol[mid]
-        target = targets[fname][mid]
-        fig = make_figure(np.abs(target), np.abs(recon),
-                          np.angle(target), np.angle(recon),
-                          f"{cat} | {fname} | slice {mid}")
-        wandb.log({f"{cat}/sample": wandb.Image(fig)}, step=step)
+        fig = make_figure(
+            np.abs(targets[fname][mid]), np.abs(vol[mid]),
+            np.angle(targets[fname][mid]), np.angle(vol[mid]),
+            f"{cat} | {fname} | slice {mid}"
+        )
+        buckets[cat].append(wandb.Image(fig))
         plt.close(fig)
-        sent_cnt[cat] = sent_cnt.get(cat, 0) + 1
+
+    # ─── 한 번만 wandb.log ─────────────────────────────
+    log_dict = {f"{cat}/samples": imgs for cat, imgs in buckets.items()}
+    wandb.log(log_dict, step=step)
