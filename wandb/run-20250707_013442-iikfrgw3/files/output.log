@@ -1,5 +1,0 @@
-Current cuda device:  0
-Error executing job with overrides: []
-Error locating target 'sophia_optim.SophiaG', set env var HYDRA_FULL_ERROR=1 to see chained exception.
-
-Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.

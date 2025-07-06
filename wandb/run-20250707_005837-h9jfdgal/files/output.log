@@ -1,6 +1,0 @@
-Current cuda device:  0
-Error executing job with overrides: ['optimizer=lamb']
-Error in call to target 'pytorch_lamb.lamb.Lamb':
-TypeError("Lamb.__init__() got an unexpected keyword argument 'clamp_value'")
-
-Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
