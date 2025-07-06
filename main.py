@@ -4,6 +4,7 @@ FastMRI_challenge/main.py
 """
 import hydra, wandb, torch, sys, os
 from omegaconf import DictConfig, OmegaConf
+from collections.abc import Mapping
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -18,29 +19,40 @@ from utils.learning.train_part import train      # 기존 학습 루프
 from utils.common.utils import seed_fix          # seed 고정 함수
 
 # ───────────────────────────────────────────────────────────────────────────────
+
 def _flatten_cfg_to_args(cfg: DictConfig) -> SimpleNamespace:
     """
-    Hydra cfg → 기존 train.py에서 쓰던 args 네임스페이스로 변환
-    (train_part.py가 그대로라 필수)
+    ✔️  *재귀적으로* 모든 항목을 평탄화하여 SimpleNamespace 로 변환한다.
+       - model / data 서브트리는 “옛 argparser 스타일” 유지 → prefix 미부여
+       - 그 외 서브트리는 `<tree>_<leaf>` 형식으로 충돌 방지
     """
-    flat = OmegaConf.to_container(cfg, resolve=True)
+    container = OmegaConf.to_container(cfg, resolve=True)
     args = SimpleNamespace()
 
-    # 1) 최상위 키
-    for k, v in flat.items():
-        if k in {"model", "data", "wandb"}:
-            continue
-        setattr(args, k, v)
+    def recurse(prefix: str, node: Mapping):
+        for k, v in node.items():
+            new_key = f"{prefix}_{k}" if prefix else k
 
-    # 2) model / data 하위 키를 args에 주입
-    for sub in ("model", "data"):
-        for k, v in flat[sub].items():
-            setattr(args, k, v)
+            # special-case: dict를 '통째로' 보존할 키들
+            PRESERVE = {"model", "data", "LRscheduler", "LossFunction", "optimizer"}
 
-    # 3) train_part.py가 기대하는 대문자 필드를 맞춰줌
-    args.GPU_NUM = flat["GPU_NUM"]
-    args.use_wandb = cfg.wandb.use_wandb
-    args.max_vis_per_cat = cfg.wandb.max_vis_per_cat   # epoch 마다 카테고리별 이미지 수 (0 → 안 올림)
+            # (1) 보존용 속성 먼저 세팅
+            if prefix == "" and k in PRESERVE and isinstance(v, Mapping):
+                # args.LRscheduler = {...}  처럼 딕셔너리 그대로 유지
+                setattr(args, k, v)
+                # (2) 동시에 하위 키도 평탄화해 주기
+                recurse("", v) if k in {"model", "data"} else recurse(k, v)
+            elif isinstance(v, Mapping):
+                recurse(new_key, v)        # 일반 dict: prefix 유지
+            else:
+                setattr(args, new_key, v)
+
+    recurse("", container)
+
+    # 추가로 main.py 레거시 필드도 맞춰줌
+    args.GPU_NUM         = container["GPU_NUM"]
+    args.use_wandb       = container["wandb"]["use_wandb"]
+    args.max_vis_per_cat = container["wandb"]["max_vis_per_cat"]
 
     # 4) Path 변환: data_path_* 를 Path 객체로 변경하여 load_data 에서의 '/' 연산 오류 방지
     if hasattr(args, 'data_path_train'):
@@ -49,7 +61,7 @@ def _flatten_cfg_to_args(cfg: DictConfig) -> SimpleNamespace:
         args.data_path_val = Path(args.data_path_val)
 
     # 5) 결과 경로 세팅 (train.py 로직 반영) :contentReference[oaicite:1]{index=1}
-    result_dir = Path(cfg.data.PROJECT_ROOT) / "result" / args.net_name
+    result_dir = Path(cfg.data.PROJECT_ROOT) / "result" / args.exp_name
     args.exp_dir = result_dir / "checkpoints"
     args.val_dir = result_dir / "reconstructions_val"
     args.main_dir = result_dir / Path(__file__).name
@@ -58,7 +70,6 @@ def _flatten_cfg_to_args(cfg: DictConfig) -> SimpleNamespace:
         p.mkdir(parents=True, exist_ok=True)
 
     return args
-
 
 @hydra.main(config_path="configs", config_name="train", version_base=None)
 def main(cfg: DictConfig):
@@ -73,7 +84,7 @@ def main(cfg: DictConfig):
     wandb.init(
         project=cfg.wandb.project,
         entity=cfg.wandb.entity,
-        name=args.net_name,
+        name=args.exp_name,
         config=OmegaConf.to_container(cfg, resolve=True),
     )
 

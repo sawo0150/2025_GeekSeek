@@ -1,0 +1,16 @@
+Current cuda device:  0
+Error executing job with overrides: []
+Traceback (most recent call last):
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/main.py", line 135, in main
+    train(args)   # utils.learning.train_part.train 호출 :contentReference[oaicite:2]{index=2}
+    ^^^^^^^^^^^
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/learning/train_part.py", line 217, in train
+    model = _wrap_all_with_ckpt(model)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/learning/train_part.py", line 194, in _wrap_all_with_ckpt
+    raise RuntimeError(
+RuntimeError: 현재 PyTorch 빌드에서 activation checkpoint를 지원하지 않습니다.
+ - torch>=1.12 로 업그레이드하거나,
+ - train.yaml 에서 checkpointing=false 로 설정하세요.
+
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.

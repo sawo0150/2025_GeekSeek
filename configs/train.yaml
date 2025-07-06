@@ -2,14 +2,20 @@ defaults:
   - _self_
   - model: varnet_small   # 모델 설정
   - data: local_sangwonDesktop           # 데이터 경로 설정
-
+  - LRscheduler: CosineAnnealingLR        # ⬅️  추가 - https://gaussian37.github.io/dl-pytorch-lr_scheduler/참고
+  - LossFunction: SSIMLoss
+  - training: base
+  - optimizer: sophia_g          # ⬅️ 새로 추가
+  
 # === 공통 학습 하이퍼파라미터 ===
 GPU_NUM: 0
 batch_size: 1
-num_epochs: 5
+num_epochs: 1
 lr: 1e-3
 report_interval: 500
 seed: 430
+
+exp_name : small_varnet_resume_test
 
 # these three are *required* by utils/data/load_data.py → create_data_loaders
 input_key:  kspace
@@ -20,4 +26,4 @@ wandb:
   project: fastmri-2025
   entity: swpants05-seoul-national-university        # W&B 팀/계정
   use_wandb: true           # false 이면 모든 wandb 로그 함수가 noop
-  max_vis_per_cat: 1        # epoch 마다 카테고리별 이미지 수 (0 → 안 올림)
+  max_vis_per_cat: 5        # epoch 마다 카테고리별 이미지 수 (0 → 안 올림)

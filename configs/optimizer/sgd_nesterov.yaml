@@ -1,0 +1,6 @@
+# ── SGD + Nesterov ─────────────────────────────────────────────
+_target_: torch.optim.SGD
+lr: 1e-3
+momentum: 0.9
+weight_decay: 0.0
+nesterov: true         # 네스테로프 보간 가속

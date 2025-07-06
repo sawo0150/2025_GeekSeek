@@ -1,0 +1,1 @@
+_target_: utils.common.loss_function.L1LossWrapper   # 래퍼(아래 2️⃣ 참고)

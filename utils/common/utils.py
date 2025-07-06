@@ -5,6 +5,8 @@ LICENSE file in the root directory of this source tree.
 """
 
 from skimage.metrics import structural_similarity
+from torchmetrics.functional import structural_similarity_index_measure as ssim_f
+
 import h5py
 import numpy as np
 import torch
@@ -45,6 +47,24 @@ def ssim_loss(gt, pred, maxval=None):
 
     ssim = ssim / gt.shape[0]
     return 1 - ssim
+
+def ssim_loss_gpu(output, target, maximum):
+    """
+    output, target : (B, H, W) float32 CUDA tensors
+    maximum        : (B,)         - 각 샘플의 max 값
+    반환            : (B,)         - slice 평균 후 1-SSIM
+    """
+    # ① validate 로직과 맞추기 ─ 정규화
+    output = output / maximum[:, None, None]   # (B,H,W)
+    target = target / maximum[:, None, None]
+
+    # ② 토치메트릭 입력 규격 맞추기
+    output = output.unsqueeze(1)               # (B,1,H,W)
+    target = target.unsqueeze(1)
+
+    # ③ GPU SSIM (배치 평균)
+    ssim_val = ssim_f(output, target, data_range=1.0)  # tensor shape (B,)
+    return 1 - ssim_val.mean()                         # validate 와 동일 의미
 
 def seed_fix(n):
     torch.manual_seed(n)

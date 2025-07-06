@@ -12,6 +12,7 @@ import fastmri
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.checkpoint import checkpoint  
 from fastmri.data import transforms
 
 from unet import Unet
@@ -216,6 +217,7 @@ class VarNet(nn.Module):
         sens_pools: int = 4,
         chans: int = 18,
         pools: int = 4,
+        use_checkpoint: bool = False,                  # ★ NEW 토글 파라미터
     ):
         """
         Args:
@@ -234,13 +236,27 @@ class VarNet(nn.Module):
         self.cascades = nn.ModuleList(
             [VarNetBlock(NormUnet(chans, pools)) for _ in range(num_cascades)]
         )
+        self.use_checkpoint = use_checkpoint           # ★ NEW 저장
 
     def forward(self, masked_kspace: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
         sens_maps = self.sens_net(masked_kspace, mask)
         kspace_pred = masked_kspace.clone()
 
+        # for cascade in self.cascades:
+        #     kspace_pred = cascade(kspace_pred, masked_kspace, mask, sens_maps)
         for cascade in self.cascades:
-            kspace_pred = cascade(kspace_pred, masked_kspace, mask, sens_maps)
+            if self.use_checkpoint:
+                # activation-checkpointing ↘ 메모리↓, 계산 1회↑
+                kspace_pred = checkpoint(
+                    cascade,
+                    kspace_pred,        # 반드시 Tensor
+                    masked_kspace,
+                    mask,
+                    sens_maps,
+                    use_reentrant=False,
+                )
+            else:
+                kspace_pred = cascade(kspace_pred, masked_kspace, mask, sens_maps)
         result = fastmri.rss(fastmri.complex_abs(fastmri.ifft2c(kspace_pred)), dim=1)
         result = center_crop(result, 384, 384)
         return result

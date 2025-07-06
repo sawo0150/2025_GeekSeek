@@ -1,0 +1,107 @@
+Current cuda device:  0
+[Hydra] loss_func ▶ SSIMLoss()
+[Hydra] Scheduler ▶ <torch.optim.lr_scheduler.CosineAnnealingLR object at 0x7de559702c90>
+/home/swpants05/Desktop/2025_FastMri/Data/train
+/home/swpants05/Desktop/2025_FastMri/Data/val
+Epoch # 0 ............... varnet_small ...............
+Epoch[ 0/5]/:   0%|                          | 0/4937 [00:00<?, ?it/s]/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/model/varnet.py:286: UserWarning: where received a uint8 condition tensor. This behavior is deprecated and will be removed in a future version of PyTorch. Use a boolean condition instead. (Triggered internally at /pytorch/aten/src/ATen/native/TensorCompare.cpp:611.)
+  soft_dc = torch.where(mask, current_kspace - ref_kspace, zero) * self.dc_weight
+/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/torchmetrics/utilities/prints.py:70: FutureWarning: Importing `spectral_angle_mapper` from `torchmetrics.functional` was deprecated and will be removed in 2.0. Import `spectral_angle_mapper` from `torchmetrics.image` instead.
+  _future_warning(
+tensor([0.0003], device='cuda:0')
+0.8352354764938354
+target range : 0.0 8.684580825502053e-05
+after /maximum: 0.0 0.2598729133605957
+Epoch[ 0/5]/:   0%|     | 8/4937 [00:01<13:33,  6.06it/s, loss=0.1108]
+tensor([0.0002], device='cuda:0')
+0.8497040867805481
+target range : 0.0 0.0001280100259464234
+after /maximum: 0.0 0.5643410682678223
+tensor([0.0001], device='cuda:0')
+0.5958030819892883
+target range : 0.0 5.391504237195477e-05
+after /maximum: 0.0 0.49569186568260193
+tensor([0.0008], device='cuda:0', dtype=torch.float64)
+0.7808718520356965
+target range : 1.1457144864834845e-05 0.0004588573065120727
+after /maximum: 0.014900789416591629 0.5967748664491896
+tensor([0.0002], device='cuda:0')
+0.8307579755783081
+target range : 0.0 0.00010537589696468785
+after /maximum: 0.0 0.6591770052909851
+tensor([0.0007], device='cuda:0', dtype=torch.float64)
+0.7867356347021368
+target range : 8.822398740448989e-06 0.0006441917503252625
+after /maximum: 0.01357025211356053 0.9908693450127104
+tensor([0.0002], device='cuda:0')
+0.7899092435836792
+target range : 0.0 0.00016473527648486197
+after /maximum: 0.0 0.9156785607337952
+tensor([0.0008], device='cuda:0', dtype=torch.float64)
+0.8902066083883908
+target range : 1.0581086826277897e-05 0.0003530825488269329
+after /maximum: 0.013178229782391956 0.43974716746849846
+tensor([0.0007], device='cuda:0', dtype=torch.float64)
+0.8775595115951687
+target range : 1.0419206773804035e-05 0.00042439420940354466
+after /maximum: 0.0159701654526695 0.6504953676867061
+tensor([0.0009], device='cuda:0', dtype=torch.float64)
+0.8142626240606239
+target range : 1.1145407370349858e-05 0.0008685216307640076
+after /maximum: 0.012832619160219244 0.999999995483091
+tensor([0.0001], device='cuda:0')
+0.7284356355667114
+target range : 0.0 8.937361417338252e-05
+after /maximum: 0.0 0.6190862059593201
+tensor([0.0003], device='cuda:0')
+0.883696973323822
+target range : 0.0 0.00019033199350815266
+after /maximum: 0.0 0.6627887487411499
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/main.py", line 91, in <module>
+    main()
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/hydra/main.py", line 94, in decorated_main
+    _run_hydra(
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/hydra/_internal/utils.py", line 394, in _run_hydra
+    _run_app(
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/hydra/_internal/utils.py", line 457, in _run_app
+    run_and_report(
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/hydra/_internal/utils.py", line 220, in run_and_report
+    return func()
+           ^^^^^^
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/hydra/_internal/utils.py", line 458, in <lambda>
+    lambda: hydra.run(
+            ^^^^^^^^^^
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/hydra/_internal/hydra.py", line 119, in run
+    ret = run_job(
+          ^^^^^^^^
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/hydra/core/utils.py", line 186, in run_job
+    ret.return_value = task_function(task_cfg)
+                       ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/main.py", line 84, in main
+    train(args)   # utils.learning.train_part.train 호출 :contentReference[oaicite:2]{index=2}
+    ^^^^^^^^^^^
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/learning/train_part.py", line 197, in train
+    train_loss, train_time = train_epoch(args, epoch, model,
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/learning/train_part.py", line 53, in train_epoch
+    output = model(kspace, mask)
+             ^^^^^^^^^^^^^^^^^^^
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1751, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1762, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/model/varnet.py", line 243, in forward
+    kspace_pred = cascade(kspace_pred, masked_kspace, mask, sens_maps)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1751, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1762, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/model/varnet.py", line 285, in forward
+    zero = torch.zeros(1, 1, 1, 1, 1).to(current_kspace)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt

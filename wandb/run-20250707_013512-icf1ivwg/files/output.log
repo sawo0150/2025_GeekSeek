@@ -1,0 +1,6 @@
+Current cuda device:  0
+Error executing job with overrides: []
+Error in call to target 'torch.optim.Adafactor':
+TypeError("Adafactor.__init__() got an unexpected keyword argument 'relative_step'")
+
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.

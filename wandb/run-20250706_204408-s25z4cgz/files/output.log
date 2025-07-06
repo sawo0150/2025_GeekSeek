@@ -1,0 +1,77 @@
+Current cuda device:  0
+/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/learning/train_part.py:191: FutureWarning: `torch.cuda.amp.GradScaler(args...)` is deprecated. Please use `torch.amp.GradScaler('cuda', args...)` instead.
+  scaler = GradScaler(enabled=amp_enabled)
+[Hydra] loss_func ▶ SSIMLoss()
+[Hydra] Scheduler ▶ <torch.optim.lr_scheduler.CosineAnnealingLR object at 0x7bc7a992ff90>
+/home/swpants05/Desktop/2025_FastMri/Data/train
+/home/swpants05/Desktop/2025_FastMri/Data/val
+Epoch # 0 ............... varnet_small ...............
+Epoch[ 0/5]/:   0%|                          | 0/4937 [00:00<?, ?it/s]/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/learning/train_part.py:64: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+True 1
+  with autocast(enabled=amp_enabled):
+/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/model/varnet.py:302: UserWarning: where received a uint8 condition tensor. This behavior is deprecated and will be removed in a future version of PyTorch. Use a boolean condition instead. (Triggered internally at /pytorch/aten/src/ATen/native/TensorCompare.cpp:611.)
+  soft_dc = torch.where(mask, current_kspace - ref_kspace, zero) * self.dc_weight
+max alloc MB: 2031.51953125
+/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/torchmetrics/utilities/prints.py:70: FutureWarning: Importing `spectral_angle_mapper` from `torchmetrics.functional` was deprecated and will be removed in 2.0. Import `spectral_angle_mapper` from `torchmetrics.image` instead.
+  _future_warning(
+Traceback (most recent call last):                                    
+True 1
+max alloc MB: 2284.353515625
+True 1
+max alloc MB: 2637.98779296875
+True 1
+max alloc MB: 2875.6767578125
+True 1
+max alloc MB: 2875.6767578125
+True 1
+max alloc MB: 2875.6767578125
+True 1
+max alloc MB: 2875.6767578125
+True 1
+max alloc MB: 2875.6767578125
+True 1
+max alloc MB: 2875.6767578125
+True 1
+max alloc MB: 2875.6767578125
+True 1
+max alloc MB: 2875.6767578125
+True 1
+max alloc MB: 2875.6767578125
+True 1
+max alloc MB: 2875.6767578125
+True 1
+max alloc MB: 2875.6767578125
+True 1
+max alloc MB: 2875.6767578125
+True 1
+max alloc MB: 2875.6767578125
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/main.py", line 142, in <module>
+    main()
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/hydra/main.py", line 94, in decorated_main
+    _run_hydra(
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/hydra/_internal/utils.py", line 394, in _run_hydra
+    _run_app(
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/hydra/_internal/utils.py", line 457, in _run_app
+    run_and_report(
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/hydra/_internal/utils.py", line 220, in run_and_report
+    return func()
+           ^^^^^^
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/hydra/_internal/utils.py", line 458, in <lambda>
+    lambda: hydra.run(
+            ^^^^^^^^^^
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/hydra/_internal/hydra.py", line 119, in run
+    ret = run_job(
+          ^^^^^^^^
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/hydra/core/utils.py", line 186, in run_job
+    ret.return_value = task_function(task_cfg)
+                       ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/main.py", line 135, in main
+    train(args)   # utils.learning.train_part.train 호출 :contentReference[oaicite:2]{index=2}
+    ^^^^^^^^^^^
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/learning/train_part.py", line 220, in train
+    train_loss, train_time = train_epoch(args, epoch, model,
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/learning/train_part.py", line 87, in train_epoch
+    ssim_val = 1 - ssim_loss_gpu(output.detach(), target, maximum).item()
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt

@@ -52,3 +52,10 @@ class SSIMLoss(nn.Module):
         S = (A1 * A2) / D
 
         return 1 - S.mean()
+
+
+class L1LossWrapper(nn.Module):
+    """train_part.train_epoch가 maximum을 넘겨도 무시하도록 3-인자 래퍼"""
+    def __init__(self): super().__init__(); self.loss = nn.L1Loss()
+    def forward(self, output, target, maximum=None):
+        return self.loss(output, target)

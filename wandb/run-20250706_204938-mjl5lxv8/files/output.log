@@ -1,0 +1,111 @@
+Current cuda device:  0
+/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/learning/train_part.py:192: FutureWarning: `torch.cuda.amp.GradScaler(args...)` is deprecated. Please use `torch.amp.GradScaler('cuda', args...)` instead.
+  scaler = GradScaler(enabled=amp_enabled)
+[Hydra] loss_func ▶ SSIMLoss()
+[Hydra] Scheduler ▶ <torch.optim.lr_scheduler.CosineAnnealingLR object at 0x78c44edbe350>
+/home/swpants05/Desktop/2025_FastMri/Data/train
+/home/swpants05/Desktop/2025_FastMri/Data/val
+Epoch # 0 ............... varnet_small ...............
+Epoch[ 0/5]/:   0%|                          | 0/4937 [00:00<?, ?it/s]/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/learning/train_part.py:64: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+True 10
+  with autocast(enabled=amp_enabled):
+/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/model/varnet.py:302: UserWarning: where received a uint8 condition tensor. This behavior is deprecated and will be removed in a future version of PyTorch. Use a boolean condition instead. (Triggered internally at /pytorch/aten/src/ATen/native/TensorCompare.cpp:611.)
+  soft_dc = torch.where(mask, current_kspace - ref_kspace, zero) * self.dc_weight
+max alloc MB: 2031.51953125
+/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/torchmetrics/utilities/prints.py:70: FutureWarning: Importing `spectral_angle_mapper` from `torchmetrics.functional` was deprecated and will be removed in 2.0. Import `spectral_angle_mapper` from `torchmetrics.image` instead.
+  _future_warning(
+Traceback (most recent call last):                                    
+True 10
+max alloc MB: 2284.35400390625
+True 10
+max alloc MB: 2543.169921875
+True 10
+max alloc MB: 2828.26806640625
+True 10
+max alloc MB: 2828.26806640625
+True 10
+max alloc MB: 2828.26806640625
+True 10
+max alloc MB: 2828.26806640625
+True 10
+max alloc MB: 2828.26806640625
+True 10
+max alloc MB: 2828.26806640625
+True 10
+max alloc MB: 2828.26806640625
+True 10
+max alloc MB: 2828.26806640625
+True 10
+max alloc MB: 2828.26806640625
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/main.py", line 142, in <module>
+    main()
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/hydra/main.py", line 94, in decorated_main
+    _run_hydra(
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/hydra/_internal/utils.py", line 394, in _run_hydra
+    _run_app(
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/hydra/_internal/utils.py", line 457, in _run_app
+    run_and_report(
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/hydra/_internal/utils.py", line 220, in run_and_report
+    return func()
+           ^^^^^^
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/hydra/_internal/utils.py", line 458, in <lambda>
+    lambda: hydra.run(
+            ^^^^^^^^^^
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/hydra/_internal/hydra.py", line 119, in run
+    ret = run_job(
+          ^^^^^^^^
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/hydra/core/utils.py", line 186, in run_job
+    ret.return_value = task_function(task_cfg)
+                       ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/main.py", line 135, in main
+    train(args)   # utils.learning.train_part.train 호출 :contentReference[oaicite:2]{index=2}
+    ^^^^^^^^^^^
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/learning/train_part.py", line 221, in train
+    train_loss, train_time = train_epoch(args, epoch, model,
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/learning/train_part.py", line 95, in train_epoch
+    pbar.set_postfix(loss=f"{loss.item():.4g}")
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/tqdm/std.py", line 1431, in set_postfix
+    self.refresh()
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/tqdm/std.py", line 1347, in refresh
+    self.display()
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/tqdm/std.py", line 1495, in display
+    self.sp(self.__str__() if msg is None else msg)
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/tqdm/std.py", line 459, in print_status
+    fp_write('\r' + s + (' ' * max(last_len[0] - len_s, 0)))
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/tqdm/std.py", line 452, in fp_write
+    fp.write(str(s))
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/tqdm/utils.py", line 196, in inner
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/contextlib.py", line 81, in inner
+    return func(*args, **kwds)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/wandb/sdk/lib/console_capture.py", line 168, in write_with_callbacks
+    n = orig_write(s)
+        ^^^^^^^^^^^^^
+KeyboardInterrupt
+Exception ignored in atexit callback: <bound method TMonitor.exit of <TMonitor(Thread-3, stopped daemon 132783699514944)>>
+Traceback (most recent call last):
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/tqdm/_monitor.py", line 44, in exit
+    self.join()
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/threading.py", line 1112, in join
+    self._wait_for_tstate_lock()
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/threading.py", line 1132, in _wait_for_tstate_lock
+    if lock.acquire(block, timeout):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt:
+Exception ignored in atexit callback: <function _start_and_connect_service.<locals>.teardown_atexit at 0x78c44ecaf100>
+Traceback (most recent call last):
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 54, in teardown_atexit
+    conn.teardown(hooks.exit_code)
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 182, in teardown
+    self._router.join()
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/wandb/sdk/interface/router.py", line 75, in join
+    self._thread.join()
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/threading.py", line 1112, in join
+    self._wait_for_tstate_lock()
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/threading.py", line 1132, in _wait_for_tstate_lock
+    if lock.acquire(block, timeout):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt:

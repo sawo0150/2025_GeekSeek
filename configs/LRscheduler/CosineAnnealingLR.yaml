@@ -1,0 +1,4 @@
+# configs/scheduler/cosine.yaml
+_target_: torch.optim.lr_scheduler.CosineAnnealingLR
+T_max: ${num_epochs}        # 전체 epoch 수와 맞춤
+eta_min: 1e-6
