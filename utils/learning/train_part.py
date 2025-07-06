@@ -148,23 +148,23 @@ def validate(args, model, data_loader, acc_val, epoch):
     return metric_loss, n_slices, reconstructions, targets, None, time.perf_counter() - start
 
 def save_model(args, exp_dir, epoch, model, optimizer, best_val_loss, is_new_best):
-    torch.save(
-        {
-            'epoch': epoch,
-            'args': args,
-            'model': model.state_dict(),
-            'optimizer': optimizer.state_dict(),
-            'best_val_loss': best_val_loss,
-            'exp_dir': exp_dir
-        },
-        f=exp_dir / 'model.pt'
-    )
+    
+    checkpoint = {
+        'epoch':         epoch,
+        'args':          args,                              # ← SimpleNamespace 통째로
+        'model':         model.state_dict(),
+        'optimizer':     optimizer.state_dict(),
+        'best_val_loss': best_val_loss,
+        'exp_dir':       str(exp_dir),                      # Path는 문자열로 저장해도 OK
+    }
+    torch.save(checkpoint, exp_dir / 'model.pt')
     if is_new_best:
         shutil.copyfile(exp_dir / 'model.pt', exp_dir / 'best_model.pt')
 
 def train(args):
     device = torch.device(f'cuda:{args.GPU_NUM}' if torch.cuda.is_available() else 'cpu')
     torch.cuda.set_device(device)
+    
     print('Current cuda device: ', torch.cuda.current_device())
 
     # ▸ 0. 옵션 파싱 (기본값 유지)
@@ -192,6 +192,22 @@ def train(args):
         optimizer = torch.optim.Adam(model.parameters(), args.lr)
     print(f"[Hydra] Optimizer ▶ {optimizer.__class__.__name__}")
 
+    # ── Resume logic (이제 model, optimizer가 정의된 이후) ──
+    start_epoch   = 0
+    best_val_loss = float('inf')
+    if getattr(args, 'resume_checkpoint', None):
+        ckpt = torch.load(
+            args.resume_checkpoint,
+            map_location=device,
+            weights_only=False
+        )
+        model.load_state_dict(ckpt['model'])
+        optimizer.load_state_dict(ckpt['optimizer'])
+        best_val_loss = ckpt.get('best_val_loss', best_val_loss)
+        start_epoch   = ckpt.get('epoch', 0)
+        print(f"[Resume] Loaded '{args.resume_checkpoint}' → "
+              f"epoch {start_epoch}, best_val_loss={best_val_loss:.4f}")
+
     # ▸ 2. AMP scaler (옵션)
     scaler = GradScaler(enabled=amp_enabled)
 
@@ -207,8 +223,7 @@ def train(args):
     else:
         scheduler = None
 
-    best_val_loss = 1.
-    start_epoch = 0
+    best_val_loss = 10000.
 
     print(args.data_path_train)
     print(args.data_path_val)
@@ -234,7 +249,7 @@ def train(args):
         np.save(file_path, val_loss_log)
         print(f"loss file saved! {file_path}")
 
-        train_loss = torch.tensor(train_loss).cuda(non_blocking=True)
+        # train_loss = torch.tensor(train_loss).cuda(non_blocking=True)
         val_loss = torch.tensor(val_loss).cuda(non_blocking=True)
         num_subjects = torch.tensor(num_subjects).cuda(non_blocking=True)
 

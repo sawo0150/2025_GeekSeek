@@ -13,4 +13,8 @@ Epoch[ 0/1]/:   0%|                          | 0/4937 [00:00<?, ?it/s]/home/swpa
   soft_dc = torch.where(mask, current_kspace - ref_kspace, zero) * self.dc_weight
 /home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/torchmetrics/utilities/prints.py:70: FutureWarning: Importing `spectral_angle_mapper` from `torchmetrics.functional` was deprecated and will be removed in 2.0. Import `spectral_angle_mapper` from `torchmetrics.image` instead.
   _future_warning(
-Epoch[ 0/1]/:  92%|▉| 4530/4937 [12:55<00:58,  6.92it/s, loss=0.05479]
+[34m[1mwandb[0m: [33mWARNING[0m Saving files without folders. If you want to preserve subdirectories pass base_path to wandb.save, i.e. wandb.save("/mnt/folder/file.h5", base_path="/mnt")
+loss file saved! /home/swpants05/Desktop/2025_FastMri/result/varnet_small/val_loss_log
+Epoch = [   0/   1] TrainLoss = 0.1606 ValLoss = 0.239 TrainTime = 840.1612s ValTime = 110.5948s
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@NewRecord@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+ForwardTime = 0.9181s

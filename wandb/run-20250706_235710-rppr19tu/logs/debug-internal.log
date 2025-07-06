@@ -1,0 +1,13 @@
+{"time":"2025-07-06T23:57:11.146774103+09:00","level":"INFO","msg":"stream: starting","core version":"0.21.0"}
+{"time":"2025-07-06T23:57:11.476779643+09:00","level":"INFO","msg":"stream: created new stream","id":"rppr19tu"}
+{"time":"2025-07-06T23:57:11.476807526+09:00","level":"INFO","msg":"stream: started","id":"rppr19tu"}
+{"time":"2025-07-06T23:57:11.476824347+09:00","level":"INFO","msg":"writer: Do: started","stream_id":"rppr19tu"}
+{"time":"2025-07-06T23:57:11.476826331+09:00","level":"INFO","msg":"sender: started","stream_id":"rppr19tu"}
+{"time":"2025-07-06T23:57:11.476853602+09:00","level":"INFO","msg":"handler: started","stream_id":"rppr19tu"}
+{"time":"2025-07-07T00:12:23.468925145+09:00","level":"INFO","msg":"handler: operation stats","stats":{"operations":[{"desc":"uploading checkpoints/best_model.pt","runtime_seconds":1.8516591500000001,"progress":"7.8MB/8.5MB"}],"total_operations":1}}
+{"time":"2025-07-07T00:12:25.878019385+09:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2025-07-07T00:12:26.397089824+09:00","level":"INFO","msg":"stream: closing","id":"rppr19tu"}
+{"time":"2025-07-07T00:12:26.397113208+09:00","level":"INFO","msg":"handler: closed","stream_id":"rppr19tu"}
+{"time":"2025-07-07T00:12:26.397125371+09:00","level":"INFO","msg":"writer: Close: closed","stream_id":"rppr19tu"}
+{"time":"2025-07-07T00:12:26.397150689+09:00","level":"INFO","msg":"sender: closed","stream_id":"rppr19tu"}
+{"time":"2025-07-07T00:12:26.397189061+09:00","level":"INFO","msg":"stream: closed","id":"rppr19tu"}

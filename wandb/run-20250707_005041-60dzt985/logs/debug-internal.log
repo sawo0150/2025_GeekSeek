@@ -1,0 +1,13 @@
+{"time":"2025-07-07T00:50:41.426799132+09:00","level":"INFO","msg":"stream: starting","core version":"0.21.0"}
+{"time":"2025-07-07T00:50:41.759181409+09:00","level":"INFO","msg":"stream: created new stream","id":"60dzt985"}
+{"time":"2025-07-07T00:50:41.75920847+09:00","level":"INFO","msg":"stream: started","id":"60dzt985"}
+{"time":"2025-07-07T00:50:41.759231654+09:00","level":"INFO","msg":"writer: Do: started","stream_id":"60dzt985"}
+{"time":"2025-07-07T00:50:41.759240831+09:00","level":"INFO","msg":"sender: started","stream_id":"60dzt985"}
+{"time":"2025-07-07T00:50:41.759257673+09:00","level":"INFO","msg":"handler: started","stream_id":"60dzt985"}
+{"time":"2025-07-07T00:53:18.3590247+09:00","level":"INFO","msg":"handler: operation stats","stats":{"operations":[{"desc":"uploading media/images/knee_x8/samples_0_b55aa56e0fca10f83a8d.png","runtime_seconds":1.475154644,"progress":"625.8KB/625.8KB"},{"desc":"uploading media/images/knee_x8/samples_0_03fc623da0fb6de55688.png","runtime_seconds":1.475178579,"progress":"649.4KB/649.4KB"},{"desc":"uploading media/images/knee_x8/samples_0_808885a56f44f4b98ab9.png","runtime_seconds":1.475178759,"progress":"668.9KB/668.9KB"},{"desc":"uploading checkpoints/best_model.pt","runtime_seconds":1.406493618,"progress":"2.8MB/2.8MB"}],"total_operations":4}}
+{"time":"2025-07-07T00:53:20.237801296+09:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2025-07-07T00:53:20.506317016+09:00","level":"INFO","msg":"stream: closing","id":"60dzt985"}
+{"time":"2025-07-07T00:53:20.506329369+09:00","level":"INFO","msg":"handler: closed","stream_id":"60dzt985"}
+{"time":"2025-07-07T00:53:20.506338406+09:00","level":"INFO","msg":"writer: Close: closed","stream_id":"60dzt985"}
+{"time":"2025-07-07T00:53:20.506348405+09:00","level":"INFO","msg":"sender: closed","stream_id":"60dzt985"}
+{"time":"2025-07-07T00:53:20.506388009+09:00","level":"INFO","msg":"stream: closed","id":"60dzt985"}

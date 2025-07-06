@@ -61,7 +61,7 @@ def _flatten_cfg_to_args(cfg: DictConfig) -> SimpleNamespace:
         args.data_path_val = Path(args.data_path_val)
 
     # 5) 결과 경로 세팅 (train.py 로직 반영) :contentReference[oaicite:1]{index=1}
-    result_dir = Path(cfg.data.PROJECT_ROOT) / "result" / args.net_name
+    result_dir = Path(cfg.data.PROJECT_ROOT) / "result" / args.exp_name
     args.exp_dir = result_dir / "checkpoints"
     args.val_dir = result_dir / "reconstructions_val"
     args.main_dir = result_dir / Path(__file__).name
@@ -84,7 +84,7 @@ def main(cfg: DictConfig):
     wandb.init(
         project=cfg.wandb.project,
         entity=cfg.wandb.entity,
-        name=args.net_name,
+        name=args.exp_name,
         config=OmegaConf.to_container(cfg, resolve=True),
     )
 
