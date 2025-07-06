@@ -1,0 +1,8 @@
+# configs/optim/adafactor.yaml
+# pip install torch-optimizer
+_target_: torch_optimizer.Adafactor
+lr: null               # null이면 내부 스케줄 사용
+scale_parameter: true  # 파라미터 크기 기반 스케일
+relative_step: true    # Transformer 권장
+warmup_init: true
+weight_decay: 0.0

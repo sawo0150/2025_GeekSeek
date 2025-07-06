@@ -1,0 +1,12 @@
+{"time":"2025-07-06T20:35:33.059164226+09:00","level":"INFO","msg":"stream: starting","core version":"0.21.0"}
+{"time":"2025-07-06T20:35:33.391429014+09:00","level":"INFO","msg":"stream: created new stream","id":"zie900lj"}
+{"time":"2025-07-06T20:35:33.391472115+09:00","level":"INFO","msg":"stream: started","id":"zie900lj"}
+{"time":"2025-07-06T20:35:33.391508022+09:00","level":"INFO","msg":"writer: Do: started","stream_id":"zie900lj"}
+{"time":"2025-07-06T20:35:33.39152281+09:00","level":"INFO","msg":"sender: started","stream_id":"zie900lj"}
+{"time":"2025-07-06T20:35:33.391562073+09:00","level":"INFO","msg":"handler: started","stream_id":"zie900lj"}
+{"time":"2025-07-06T20:35:34.060582466+09:00","level":"INFO","msg":"stream: closing","id":"zie900lj"}
+{"time":"2025-07-06T20:35:34.846400187+09:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2025-07-06T20:35:35.145842304+09:00","level":"INFO","msg":"handler: closed","stream_id":"zie900lj"}
+{"time":"2025-07-06T20:35:35.14588826+09:00","level":"INFO","msg":"writer: Close: closed","stream_id":"zie900lj"}
+{"time":"2025-07-06T20:35:35.145895454+09:00","level":"INFO","msg":"sender: closed","stream_id":"zie900lj"}
+{"time":"2025-07-06T20:35:35.145958562+09:00","level":"INFO","msg":"stream: closed","id":"zie900lj"}

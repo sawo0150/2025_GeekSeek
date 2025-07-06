@@ -1,0 +1,7 @@
+# configs/optim/sophia_g.yaml
+# pip install sophia-optim
+_target_: sophia_optim.SophiaG
+lr: 2e-4               # Lion 대비 2-3배 ↑ 권장 :contentReference[oaicite:0]{index=0}
+betas: [0.965, 0.99]
+rho: 0.03              # Hessian 추정 감쇠율
+weight_decay: 0.01

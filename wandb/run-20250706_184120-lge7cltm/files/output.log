@@ -1,0 +1,11 @@
+Current cuda device:  0
+Error executing job with overrides: []
+Traceback (most recent call last):
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/main.py", line 135, in main
+    train(args)   # utils.learning.train_part.train 호출 :contentReference[oaicite:2]{index=2}
+    ^^^^^^^^^^^
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/learning/train_part.py", line 207, in train
+    raise RuntimeError("현재 PyTorch가 gradient checkpointing API를 지원하지 않습니다.")
+RuntimeError: 현재 PyTorch가 gradient checkpointing API를 지원하지 않습니다.
+
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.

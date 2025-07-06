@@ -1,0 +1,12 @@
+Current cuda device:  0
+Error executing job with overrides: []
+Traceback (most recent call last):
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/main.py", line 135, in main
+    train(args)   # utils.learning.train_part.train 호출 :contentReference[oaicite:2]{index=2}
+    ^^^^^^^^^^^
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/learning/train_part.py", line 180, in train
+    model = VarNet(num_cascades=args.cascade,
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: VarNet.__init__() got an unexpected keyword argument 'use_checkpoint'
+
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.

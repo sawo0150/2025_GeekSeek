@@ -1,0 +1,102 @@
+_wandb:
+    value:
+        cli_version: 0.21.0
+        e:
+            nf9455cc6gdgqyssuhciqbzbxw8byk6i:
+                codePath: main.py
+                codePathLocal: main.py
+                cpu_count: 8
+                cpu_count_logical: 16
+                cudaVersion: "12.4"
+                disk:
+                    /:
+                        total: "982818799616"
+                        used: "618601410560"
+                email: swpants05@snu.ac.kr
+                executable: /home/swpants05/.pyenv/versions/3.11.4/bin/python3
+                git:
+                    commit: c1d2c805f95e90735f48e9e07e158d03db7e7f83
+                    remote: git@github.com:sawo0150/2025_GeekSeek.git
+                gpu: NVIDIA GeForce RTX 4070 SUPER
+                gpu_count: 1
+                gpu_nvidia:
+                    - architecture: Ada
+                      cudaCores: 7168
+                      memoryTotal: "12878610432"
+                      name: NVIDIA GeForce RTX 4070 SUPER
+                      uuid: GPU-15ce3daf-aa6f-fd1c-9624-e83615081790
+                host: swpants05-desktop
+                memory:
+                    total: "67340546048"
+                os: Linux-6.8.0-60-generic-x86_64-with-glibc2.35
+                program: /home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/main.py
+                python: CPython 3.11.4
+                root: /home/swpants05/Desktop/2025_FastMri/2025_GeekSeek
+                startedAt: "2025-07-06T09:34:52.228551Z"
+                writerId: nf9455cc6gdgqyssuhciqbzbxw8byk6i
+        m: []
+        python_version: 3.11.4
+        t:
+            "1":
+                - 1
+                - 41
+                - 50
+            "2":
+                - 1
+                - 41
+                - 50
+            "3":
+                - 13
+                - 16
+            "4": 3.11.4
+            "5": 0.21.0
+            "12": 0.21.0
+            "13": linux-x86_64
+GPU_NUM:
+    value: 0
+LRscheduler:
+    value:
+        _target_: torch.optim.lr_scheduler.CosineAnnealingLR
+        T_max: 5
+        eta_min: 1e-06
+LossFunction:
+    value:
+        _target_: utils.common.loss_function.SSIMLoss
+batch_size:
+    value: 1
+data:
+    value:
+        PROJECT_ROOT: /home/swpants05/Desktop/2025_FastMri/
+        data_path_train: /home/swpants05/Desktop/2025_FastMri/Data/train/
+        data_path_val: /home/swpants05/Desktop/2025_FastMri/Data/val/
+input_key:
+    value: kspace
+lr:
+    value: 0.001
+max_key:
+    value: max
+model:
+    value:
+        cascade: 20
+        chans: 9
+        net_name: varnet_small
+        sens_chans: 4
+num_epochs:
+    value: 5
+report_interval:
+    value: 500
+seed:
+    value: 430
+target_key:
+    value: image_label
+training:
+    value:
+        accum_steps: 1
+        amp: false
+        checkpointing: true
+wandb:
+    value:
+        entity: swpants05-seoul-national-university
+        max_vis_per_cat: 5
+        project: fastmri-2025
+        use_wandb: true
