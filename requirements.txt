@@ -9,3 +9,4 @@ opencv-python
 matplotlib
 wandb
 hydra-core==1.3.*
+torchmetrics

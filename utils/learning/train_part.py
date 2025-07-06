@@ -58,10 +58,15 @@ def train_epoch(args, epoch, model, data_loader, optimizer, loss_type,ssim_metri
         
         # -------- SSIM Metric (no grad) ----------------------------------
         with torch.no_grad():
-            ssim_val = ssim_metric(
-                output.detach().float().clamp(0, 1),
-                target.float().clamp(0, 1)
-            ).item()
+            preds  = output.detach().float().clamp(0, 1)
+            target_ = target.float().clamp(0, 1)
+
+            # torchmetrics 입력은 (B,C,H,W) → 채널 축이 없으면 삽입
+            if preds.dim() == 3:      # (B,H,W)
+                preds  = preds.unsqueeze(1)        # (B,1,H,W)
+                target_ = target_.unsqueeze(1)
+
+            ssim_val = ssim_metric(preds, target_).item()
             ssim_metric.reset()
 
         loss_val = loss.item()
@@ -207,7 +212,7 @@ def train(args):
         val_loss = torch.tensor(val_loss).cuda(non_blocking=True)
         num_subjects = torch.tensor(num_subjects).cuda(non_blocking=True)
 
-        val_loss = val_loss / num_subjects
+        # val_loss = val_loss / num_subjects
 
         is_new_best = val_loss < best_val_loss
         best_val_loss = min(best_val_loss, val_loss)
