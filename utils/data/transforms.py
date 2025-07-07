@@ -1,16 +1,13 @@
 import numpy as np
 import torch
-
 import numpy.fft as fft
 import h5py
 import os
 from tqdm import tqdm
 from typing import Dict, NamedTuple, Optional, Sequence, Tuple, Union
-
-import numpy as np
-import torch
 import fastmri
 from .subsample import MaskFunc
+
 
 
 def to_tensor(data):
@@ -689,15 +686,6 @@ class MiniCoilTransform:
 
 
 
-
-
-
-
-
-import torch
-import numpy as np
-import numpy.fft as fft
-from typing import Dict, NamedTuple, Optional, Tuple
 
 # 결과를 담을 NamedTuple을 정의합니다.
 class GccSample(NamedTuple):
