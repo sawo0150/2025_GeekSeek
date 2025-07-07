@@ -121,6 +121,8 @@ def validate(args, model, data_loader, acc_val, epoch, loss_type, ssim_metric):
             mask, kspace, target, maximum, fnames, slices, cats = data
             kspace = kspace.cuda(non_blocking=True)
             mask = mask.cuda(non_blocking=True)
+            target  = target.cuda(non_blocking=True)
+            maximum = maximum.cuda(non_blocking=True)
             output = model(kspace, mask)
 
             # for i in range(output.shape[0]):    # validate Batch 개수 고려해서 for로 묶었는듯
@@ -273,7 +275,7 @@ def train(args):
         np.save(file_path, val_loss_log)
         print(f"loss file saved! {file_path}")
 
-        # train_loss = torch.tensor(train_loss).cuda(non_blocking=True)
+        train_loss = torch.tensor(train_loss).cuda(non_blocking=True)
         val_loss = torch.tensor(val_loss).cuda(non_blocking=True)
         num_subjects = torch.tensor(num_subjects).cuda(non_blocking=True)
 

@@ -1,2 +1,7 @@
-_target_: utils.common.loss_function.SSIMLoss   # 그대로
-# SSIMLoss(output, target, maximum)의 시그니처 유지
+_target_: utils.common.loss_function.SSIMLoss
+win_size: 7
+k1: 0.01
+k2: 0.03
+mask_threshold: ${data.mask_thresholds}
+mask_only: true
+region_weight: false

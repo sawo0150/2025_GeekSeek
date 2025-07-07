@@ -63,15 +63,19 @@ class MaskedLoss(nn.Module):
         if self.mask_threshold is not None:
             if cats is None:
                 raise ValueError("`cats` 리스트를 반드시 전달해야 합니다.")
-            # 단일 샘플인 경우에도 리스트로
-            if not isinstance(cats, list):
-                cats = [cats]
-                # [H,W] → [1,H,W]
-                if target.dim() == 2:
-                    target = target.unsqueeze(0)
-                    output = output.unsqueeze(0)
 
-            mask = self._make_mask(target, cats)
+            # 목록 또는 튜플로 통일
+            cats_list = cats if isinstance(cats, (list, tuple)) else [cats]
+            # 튜플/리스트 원소는 첫 번째 항목(카테고리명)만 추출
+            cats_list = [
+                c[0] if isinstance(c, (tuple, list)) and len(c) > 0 else c
+                for c in cats_list
+            ]
+            # [H,W]일 때는 배치 차원 추가
+            if output.dim() == 2:
+                output = output.unsqueeze(0)
+                target = target.unsqueeze(0)
+            mask = self._make_mask(target, cats_list)
 
         # 2) apply mask_only: zero-out outside-mask
         if mask is not None and self.mask_only:
@@ -108,7 +112,6 @@ class MaskedLoss(nn.Module):
         t_np   = targets.detach().cpu().numpy()  # (B,H,W)
         masks  = []
         kernel = np.ones((3,3), np.uint8)
-
         for i, cat in enumerate(cats):
             thr = _get_threshold(self.mask_threshold, cat)
             m   = (t_np[i] > thr).astype(np.uint8)
@@ -165,11 +168,11 @@ class MaskedLoss(nn.Module):
 #         return 1 - S.mean()
 
 
-class L1LossWrapper(nn.Module):
-    """train_part.train_epoch가 maximum을 넘겨도 무시하도록 3-인자 래퍼"""
-    def __init__(self): super().__init__(); self.loss = nn.L1Loss()
-    def forward(self, output, target, maximum=None):
-        return self.loss(output, target)
+# class L1LossWrapper(nn.Module):
+#     """train_part.train_epoch가 maximum을 넘겨도 무시하도록 3-인자 래퍼"""
+#     def __init__(self): super().__init__(); self.loss = nn.L1Loss()
+#     def forward(self, output, target, maximum=None):
+        # return self.loss(output, target)
     
 
 class L1Loss(MaskedLoss):
@@ -179,9 +182,12 @@ class L1Loss(MaskedLoss):
                  mask_only: bool = False,
                  region_weight: bool = False):
         super().__init__(mask_threshold, mask_only, region_weight)
-
+    
     def compute_loss(self, output, target, data_range):
-        return F.l1_loss(output, target)
+        # data_range 를 반영해 loss를 정규화
+        d = float(data_range) if data_range is not None else 1.0
+        return F.l1_loss(output, target) / d
+
 
 class SSIMLoss(MaskedLoss):
     """
@@ -262,11 +268,9 @@ class MSSSIMLoss(MaskedLoss):
             Y = target.unsqueeze(0).unsqueeze(0)
         else:
             raise NotImplementedError
-        return 1.0 - ms_ssim(
-            X, Y,
-            data_range=self.data_range,
-            size_average=self.size_average,
-        )
+        
+        dr = float(data_range) if data_range is not None else self.data_range
+        return 1.0 - ms_ssim(X, Y, data_range=dr, size_average=self.size_average)
 
 
 
@@ -307,10 +311,12 @@ class SSIML1Loss(MaskedLoss):
         self.weight_l1 = weight_l1
 
     def compute_loss(self, output, target, data_range):
+        # 1) SSIM part (unchanged)
         ssim_loss = self.ssim_base.compute_loss(output, target, data_range)
-        l1_loss = F.l1_loss(output, target)
+        # 2) L1 part: data_range 로 정규화
+        d = float(data_range) if data_range is not None else 1.0
+        l1_loss = F.l1_loss(output, target) / d
         return self.weight_ssim * ssim_loss + self.weight_l1 * l1_loss
-
 
 class MSSSIML1Loss(MaskedLoss):
     """Combined MS-SSIM + L1 loss with optional masking and weighting."""
@@ -331,15 +337,17 @@ class MSSSIML1Loss(MaskedLoss):
         self.weight_l1 = weight_l1
 
     def compute_loss(self, output, target, data_range):
-        # MS-SSIM
+        # 1) MS-SSIM part
         if output.ndim == 3:
-            X = output.unsqueeze(1)
-            Y = target.unsqueeze(1)
+            X = output.unsqueeze(1);  Y = target.unsqueeze(1)
         elif output.ndim == 2:
             X = output.unsqueeze(0).unsqueeze(0)
             Y = target.unsqueeze(0).unsqueeze(0)
         else:
             raise NotImplementedError
-        ms_loss = 1.0 - ms_ssim(X, Y, data_range=self.data_range, size_average=self.size_average)
-        l1_loss = F.l1_loss(output, target)
+        dr = float(data_range) if data_range is not None else self.data_range
+        ms_loss = 1.0 - ms_ssim(X, Y, data_range=dr, size_average=self.size_average)
+
+        # 2) L1 part: data_range 로 정규화
+        l1_loss = F.l1_loss(output, target) / dr
         return self.weight_ms_ssim * ms_loss + self.weight_l1 * l1_loss
