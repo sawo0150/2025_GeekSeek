@@ -1,2 +1,0 @@
-_target_: utils.common.loss_function.SSIMLoss   # 그대로
-# SSIMLoss(output, target, maximum)의 시그니처 유지

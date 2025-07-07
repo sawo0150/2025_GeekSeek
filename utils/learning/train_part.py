@@ -25,14 +25,13 @@ from utils.data.load_data import create_data_loaders
 from utils.logging.metric_accumulator import MetricAccumulator
 from utils.logging.vis_logger import log_epoch_samples
 from utils.common.utils import save_reconstructions, ssim_loss, ssim_loss_gpu
-from utils.common.loss_function import SSIMLoss
+from utils.common.loss_function import SSIMLoss # train loss & metric loss
 from utils.model.varnet import VarNet
 
 import os
 
-# def train_epoch(args, epoch, model, data_loader, optimizer, loss_type,ssim_metric, metricLog_train):
 def train_epoch(args, epoch, model, data_loader, optimizer,
-                loss_type, metricLog_train,
+                loss_type, ssim_metric, metricLog_train,
                 scaler, amp_enabled, accum_steps):
     model.train()
     # start_epoch = start_iter = time.perf_counter()
@@ -57,7 +56,9 @@ def train_epoch(args, epoch, model, data_loader, optimizer,
 
         with autocast(enabled=amp_enabled):
             output = model(kspace, mask)
-        current_loss   = loss_type(output, target, maximum)
+            
+        # pass cats list so MaskedLoss can pick per-cat thresholds
+        current_loss   = loss_type(output, target, maximum, cats)
         loss = current_loss/accum_steps
         # print("max alloc MB:", torch.cuda.max_memory_allocated() / 1024**2)
         # ─── Accumulation ──────────────────────────────────────────────
@@ -78,8 +79,11 @@ def train_epoch(args, epoch, model, data_loader, optimizer,
                 optimizer.step()
         
         # -------- SSIM Metric (no grad) ----------------------------------
+        # with torch.no_grad():
+        #     ssim_val = 1 - ssim_loss_gpu(output.detach(), target, maximum).item()
         with torch.no_grad():
-            ssim_val = 1 - ssim_loss_gpu(output.detach(), target, maximum).item()
+            ssim_loss_val = ssim_metric(output.detach(), target, maximum, cats)
+            ssim_val      = 1 - ssim_loss_val.item()
 
         loss_val = current_loss.item()
         total_loss += loss_val
@@ -97,7 +101,7 @@ def train_epoch(args, epoch, model, data_loader, optimizer,
     return total_loss / len_loader, epoch_time
 
 
-def validate(args, model, data_loader, acc_val, epoch):
+def validate(args, model, data_loader, acc_val, epoch, loss_type, ssim_metric):
     model.eval()
     reconstructions = defaultdict(dict)
     targets = defaultdict(dict)
@@ -114,21 +118,41 @@ def validate(args, model, data_loader, acc_val, epoch):
     
     with torch.no_grad():
         for idx, data in pbar:
-            mask, kspace, target, _, fnames, slices, cats = data
+            mask, kspace, target, maximum, fnames, slices, cats = data
             kspace = kspace.cuda(non_blocking=True)
             mask = mask.cuda(non_blocking=True)
+            target  = target.cuda(non_blocking=True)
+            maximum = maximum.cuda(non_blocking=True)
             output = model(kspace, mask)
 
+            # for i in range(output.shape[0]):    # validate Batch 개수 고려해서 for로 묶었는듯
+            #     reconstructions[fnames[i]][int(slices[i])] = output[i].cpu().numpy()
+            #     targets[fnames[i]][int(slices[i])] = target[i].numpy()
+                
+            #     # ---- 스칼라 누적 -----------------------------------------
+            #     loss_i  = ssim_loss(target[i].numpy(),
+            #                         output[i].cpu().numpy())
+            #     total_loss += loss_i
+            #     n_slices   += 1
+            #     acc_val.update(loss_i, 1 - loss_i, [cats[i]])
+
+            
             for i in range(output.shape[0]):    # validate Batch 개수 고려해서 for로 묶었는듯
                 reconstructions[fnames[i]][int(slices[i])] = output[i].cpu().numpy()
-                targets[fnames[i]][int(slices[i])] = target[i].numpy()
-                
-                # ---- 스칼라 누적 -----------------------------------------
-                loss_i  = ssim_loss(target[i].numpy(),
-                                    output[i].cpu().numpy())
+                targets[fnames[i]][int(slices[i])]       = target[i].cpu().numpy()
+
+                # ------------------ loss 계산 -------------------
+                out_slice = output[i]
+                tgt_slice = target[i]
+                max_i     = maximum[i] if maximum.ndim>0 else maximum
+                loss_i    = loss_type(out_slice, tgt_slice, max_i, cats[i]).item()
                 total_loss += loss_i
-                n_slices   += 1
-                acc_val.update(loss_i, 1 - loss_i, [cats[i]])
+                n_slices  += 1
+
+                # -------------- SSIM metric 계산 ---------------
+                ssim_loss_i = ssim_metric(out_slice, tgt_slice, max_i, cats[i]).item()
+                ssim_i = 1 - ssim_loss_i
+                acc_val.update(loss_i, ssim_i, [cats[i]])
 
     for fname in reconstructions:
         reconstructions[fname] = np.stack(
@@ -177,9 +201,10 @@ def train(args):
                    sens_chans=args.sens_chans,
                    use_checkpoint=checkpointing).to(device)    # ← Hydra 플래그 연결)
 
-    loss_type = SSIMLoss().to(device=device)
     loss_cfg = getattr(args, "LossFunction", {"_target_": "utils.common.loss_function.SSIMLoss"})
     loss_type = instantiate(OmegaConf.create(loss_cfg)).to(device=device)
+    # SSIM metric 계산용 (항상 SSIM 기반 로그를 위해 별도 생성)
+    ssim_metric = SSIMLoss().to(device=device)
 
     # ── 1. Optimizer 선택 (fallback: Adam) ─────────────────────────────
     optim_cfg = getattr(args, "optimizer", None)
@@ -239,17 +264,18 @@ def train(args):
 
         train_loss, train_time = train_epoch(args, epoch, model,
                                              train_loader, optimizer,
-                                             loss_type, MetricLog_train,
+                                             loss_type, ssim_metric, MetricLog_train,
                                              scaler, amp_enabled, accum_steps)
         val_loss, num_subjects, reconstructions, targets, inputs, val_time = validate(args, model, val_loader,
-                                                                                            MetricLog_val, epoch)
+                                                                                        MetricLog_val, epoch,
+                                                                                        loss_type, ssim_metric)
 
         val_loss_log = np.append(val_loss_log, np.array([[epoch, val_loss]]), axis=0)
         file_path = os.path.join(args.val_loss_dir, "val_loss_log")
         np.save(file_path, val_loss_log)
         print(f"loss file saved! {file_path}")
 
-        # train_loss = torch.tensor(train_loss).cuda(non_blocking=True)
+        train_loss = torch.tensor(train_loss).cuda(non_blocking=True)
         val_loss = torch.tensor(val_loss).cuda(non_blocking=True)
         num_subjects = torch.tensor(num_subjects).cuda(non_blocking=True)
 

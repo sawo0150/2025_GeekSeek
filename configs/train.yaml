@@ -3,9 +3,9 @@ defaults:
   - model: varnet_small   # 모델 설정
   - data: local_sangwonDesktop           # 데이터 경로 설정
   - LRscheduler: CosineAnnealingLR        # ⬅️  추가 - https://gaussian37.github.io/dl-pytorch-lr_scheduler/참고
-  - LossFunction: SSIMLoss
+  - LossFunction: L1Loss
   - training: base
-  - optimizer: sophia_g    
+  - optimizer: adamw          # ⬅️ 새로 추가  
   - aug: mraugment    # ⬅️ 새로 추가
   - transform: gcc  # ⬅️ 새로 추가
   
