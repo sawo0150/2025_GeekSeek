@@ -1,3 +1,0 @@
-# Brain slice별 recon 해야하는 범위 다르니까 이 부분을 보정하자! 
-# cos^2(slicenum/전체slice)*SSIM
-# masked_loss?

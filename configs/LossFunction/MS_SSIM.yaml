@@ -1,0 +1,6 @@
+_target_: utils.common.loss_function.MSSSIMLoss
+data_range: 1.0
+size_average: true
+mask_threshold: ${data.mask_thresholds}
+mask_only: true
+region_weight: false

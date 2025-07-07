@@ -1,3 +1,10 @@
 data_path_train: /root/Data/train/
 data_path_val:   /root/Data/val/
 PROJECT_ROOT: /root/
+
+
+mask_thresholds:
+  brain_x4: 5e-5
+  brain_x8: 5e-5
+  knee_x4:  2e-5
+  knee_x8:  2e-5
