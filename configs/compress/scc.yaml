@@ -1,0 +1,9 @@
+
+_target_: utils.data.transforms.MiniCoilTransform
+
+# MiniCoilTransform.__init__의 파라미터
+num_compressed_coils: 4
+crop_size: [320, 320]
+
+
+use_seed: true
