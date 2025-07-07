@@ -2,8 +2,10 @@ import h5py, re
 import random
 from utils.data.transforms import DataTransform
 from torch.utils.data import Dataset, DataLoader
+from hydra.utils import instantiate
 from pathlib import Path
 import numpy as np
+from torchvision.transforms import Compose  # 간단한 파이프라인용
 
 class SliceData(Dataset):
     def __init__(self, root, transform, input_key, target_key, forward=False):
@@ -78,6 +80,20 @@ def create_data_loaders(data_path, args, shuffle=False, isforward=False):
     else:
         max_key_ = -1
         target_key_ = -1
+
+    
+    # # 1) Coil compression transform
+    # comp_tr = instantiate(args.compress)    # args.compress 는 OmegaConf dict → Compressor 객체
+
+    # # 2) (기존) mask 적용 + to_tensor
+    # data_tr = DataTransform(isforward, args.max_key)
+
+    # # 3) (선택) MRaugment 같은 동적 증강
+    # aug_tr  = instantiate(args.aug)         # args.aug 역시 config 에서 지정
+
+    # # 4) Compose  
+    # transform = Compose([ comp_tr, data_tr, aug_tr ])
+
     data_storage = SliceData(
         root=data_path,
         transform=DataTransform(isforward, max_key_),

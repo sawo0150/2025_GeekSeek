@@ -1,0 +1,5 @@
+# configs/compress/gcc.yaml
+_target_: utils.data.coil_compression.GCCCompressor
+target_coils: 4
+num_calib_lines: 24
+sliding_window_size: 5

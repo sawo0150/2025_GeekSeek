@@ -1,0 +1,2 @@
+# configs/compress/none.yaml
+_target_: utils.data.coil_compression.IdentityCompressor
