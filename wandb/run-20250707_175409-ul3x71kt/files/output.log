@@ -1,0 +1,13 @@
+Error executing job with overrides: []
+Traceback (most recent call last):
+  File "/Users/sinjeongmin/Desktop/25-3/박상원/2025_GeekSeek/main.py", line 95, in main
+    train(args)   # utils.learning.train_part.train 호출 :contentReference[oaicite:2]{index=2}
+  File "/Users/sinjeongmin/Desktop/25-3/박상원/2025_GeekSeek/utils/learning/train_part.py", line 166, in train
+    torch.cuda.set_device(device)
+  File "/opt/anaconda3/envs/fmri/lib/python3.10/site-packages/torch/cuda/__init__.py", line 527, in set_device
+    device = _get_device_index(device)
+  File "/opt/anaconda3/envs/fmri/lib/python3.10/site-packages/torch/cuda/_utils.py", line 34, in _get_device_index
+    raise ValueError(f"Expected a cuda device, but got: {device}")
+ValueError: Expected a cuda device, but got: cpu
+
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.

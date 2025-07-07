@@ -1,0 +1,17 @@
+{
+  "os":  "macOS-15.0.1-arm64-arm-64bit",
+  "python":  "CPython 3.10.18",
+  "startedAt":  "2025-07-07T08:54:09.953855Z",
+  "program":  "/Users/sinjeongmin/Desktop/25-3/박상원/2025_GeekSeek/main.py",
+  "codePath":  "main.py",
+  "codePathLocal":  "main.py",
+  "git":  {
+    "remote":  "https://github.com/sawo0150/2025_GeekSeek.git",
+    "commit":  "48d39637775cf21a8a0fa96fa8da1732bc0a2df8"
+  },
+  "email":  "tlswjdals535@snu.ac.kr",
+  "root":  "/Users/sinjeongmin/Desktop/25-3/박상원/2025_GeekSeek",
+  "host":  "s-MacBook-Pro.local",
+  "executable":  "/opt/anaconda3/envs/fmri/bin/python",
+  "writerId":  "oor2o71ne69q36lpx24ee8gg4u4evr8j"
+}

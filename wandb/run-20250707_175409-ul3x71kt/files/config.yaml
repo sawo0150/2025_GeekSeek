@@ -1,0 +1,96 @@
+_wandb:
+    value:
+        cli_version: 0.21.0
+        e:
+            oor2o71ne69q36lpx24ee8gg4u4evr8j:
+                codePath: main.py
+                codePathLocal: main.py
+                email: tlswjdals535@snu.ac.kr
+                executable: /opt/anaconda3/envs/fmri/bin/python
+                git:
+                    commit: 48d39637775cf21a8a0fa96fa8da1732bc0a2df8
+                    remote: https://github.com/sawo0150/2025_GeekSeek.git
+                host: s-MacBook-Pro.local
+                os: macOS-15.0.1-arm64-arm-64bit
+                program: /Users/sinjeongmin/Desktop/25-3/박상원/2025_GeekSeek/main.py
+                python: CPython 3.10.18
+                root: /Users/sinjeongmin/Desktop/25-3/박상원/2025_GeekSeek
+                startedAt: "2025-07-07T08:54:09.953855Z"
+                writerId: oor2o71ne69q36lpx24ee8gg4u4evr8j
+        m: []
+        python_version: 3.10.18
+        t:
+            "1":
+                - 1
+                - 41
+                - 50
+            "2":
+                - 1
+                - 41
+                - 50
+            "3":
+                - 13
+                - 16
+            "4": 3.10.18
+            "5": 0.21.0
+            "12": 0.21.0
+            "13": darwin-arm64
+GPU_NUM:
+    value: 0
+LRscheduler:
+    value:
+        _target_: torch.optim.lr_scheduler.CosineAnnealingLR
+        T_max: 1
+        eta_min: 1e-06
+LossFunction:
+    value:
+        _target_: utils.common.loss_function.SSIMLoss
+batch_size:
+    value: 1
+data:
+    value:
+        PROJECT_ROOT: /Users/sinjeongmin/Desktop/25-3/박상원/2025_GeekSeek
+        data_path_train: /Users/sinjeongmin/Desktop/25-3/박상원/data1/train
+        data_path_val: /Users/sinjeongmin/Desktop/25-3/박상원/data1/val
+exp_name:
+    value: small_varnet_resume_test
+input_key:
+    value: kspace
+lr:
+    value: 0.001
+max_key:
+    value: max
+model:
+    value:
+        cascade: 1
+        chans: 9
+        net_name: varnet_small
+        sens_chans: 4
+num_epochs:
+    value: 1
+optimizer:
+    value:
+        _target_: sophia_opt.SophiaG
+        betas:
+            - 0.965
+            - 0.99
+        lr: 0.0002
+        rho: 0.03
+        weight_decay: 0.01
+report_interval:
+    value: 500
+seed:
+    value: 430
+target_key:
+    value: image_label
+training:
+    value:
+        accum_steps: 1
+        amp: false
+        checkpointing: false
+wandb:
+    value:
+        entity: swpants05-seoul-national-university
+        max_vis_per_cat: 5
+        project: fastmri-2025
+        use_wandb: true

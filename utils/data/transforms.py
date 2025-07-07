@@ -224,12 +224,35 @@ class GCCCompressor:
 
 
 
-"""
-Copyright (c) Facebook, Inc. and its affiliates.
+def to_tensor(data):
+    """
+    Convert numpy array to PyTorch tensor. For complex arrays, the real and imaginary parts
+    are stacked along the last dimension.
+    Args:
+        data (np.array): Input numpy array
+    Returns:
+        torch.Tensor: PyTorch version of data
+    """
+    return torch.from_numpy(data)
 
-This source code is licensed under the MIT license found in the
-LICENSE file in the root directory of this source tree.
-"""
+class DataTransform:
+    def __init__(self, isforward, max_key):
+        self.isforward = isforward
+        self.max_key = max_key
+    def __call__(self, mask, input, target, attrs, fname, slice):
+        if not self.isforward:
+            target = to_tensor(target)
+            maximum = attrs[self.max_key]
+        else:
+            target = -1
+            maximum = -1
+        
+        kspace = to_tensor(input * mask)
+        kspace = torch.stack((kspace.real, kspace.imag), dim=-1)
+        mask = torch.from_numpy(mask.reshape(1, 1, kspace.shape[-2], 1).astype(np.float32)).byte()
+        return mask, kspace, target, maximum, fname, slice
+
+
 
 from typing import Dict, NamedTuple, Optional, Sequence, Tuple, Union
 
@@ -1068,20 +1091,36 @@ class GCCTransform:
             crop_size=self.crop_size,
         )
 
+# --- 사용 예시 ---
+if __name__ == '__main__':
+    # 가상의 Transform 객체 생성
+    gcc_transform = GCCTransform(
+        target_coils=4,
+        num_calib_lines=24,
+        use_aligned_gcc=True,
+        crop_size=(320, 320)
+    )
 
-class DataTransform:
-    def __init__(self, isforward, max_key):
-        self.isforward = isforward
-        self.max_key = max_key
-    def __call__(self, mask, input, target, attrs, fname, slice):
-        if not self.isforward:
-            target = to_tensor(target)
-            maximum = attrs[self.max_key]
-        else:
-            target = -1
-            maximum = -1
-        
-        kspace = to_tensor(input * mask)
-        kspace = torch.stack((kspace.real, kspace.imag), dim=-1)
-        mask = torch.from_numpy(mask.reshape(1, 1, kspace.shape[-2], 1).astype(np.float32)).byte()
-        return mask, kspace, target, maximum, fname, slice
+    # 가상의 입력 데이터 생성 (실제 데이터셋에서 제공되는 형태)
+    dummy_kspace = (np.random.randn(15, 372, 320) + 1j * np.random.randn(15, 372, 320)).astype(np.complex64)
+    dummy_target = np.random.randn(320, 320).astype(np.float32)
+    dummy_attrs = {'max': 1.0, 'recon_size': (372, 320)}
+    dummy_fname = "dummy_file"
+    dummy_slice_num = 0
+
+    # Transform 적용
+    transformed_sample = gcc_transform(
+        kspace=dummy_kspace,
+        target=dummy_target,
+        attrs=dummy_attrs,
+        fname=dummy_fname,
+        slice_num=dummy_slice_num
+    )
+
+    # 결과 확인
+    print("GCC Transform 적용 완료!")
+    print(f"압축/크롭 후 k-space 크기: {transformed_sample.kspace.shape}")
+    print(f"크롭 후 target 크기: {transformed_sample.target.shape}")
+    print(f"가상 코일 수: {transformed_sample.kspace.shape[0]}")
+    print(f"최종 H, W 크기: {transformed_sample.kspace.shape[-2:]}")
+    print(f"Sample 정보: {transformed_sample}")
