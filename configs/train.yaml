@@ -5,7 +5,9 @@ defaults:
   - LRscheduler: CosineAnnealingLR        # ⬅️  추가 - https://gaussian37.github.io/dl-pytorch-lr_scheduler/참고
   - LossFunction: SSIMLoss
   - training: base
-  - optimizer: sophia_g          # ⬅️ 새로 추가
+  - optimizer: sophia_g    
+  - aug: mraugment    # ⬅️ 새로 추가
+  - transform: gcc  # ⬅️ 새로 추가
   
 # === 공통 학습 하이퍼파라미터 ===
 GPU_NUM: 0
