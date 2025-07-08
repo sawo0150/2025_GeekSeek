@@ -1,4 +1,4 @@
-_target_: utils.augmentations.mraugmentater
+_target_: utils.augmentations.mraugmentater.MRAugmenter
 
 # MRAugmenter.__init__ 에 전달될 파라미터들
 aug_on: true

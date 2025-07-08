@@ -58,12 +58,12 @@ def train_epoch(args, epoch, model, data_loader, optimizer,
             target_size = (target_orig.shape[-2], target_orig.shape[-1])
 
             for i in range(kspace_orig.shape[0]): # 배치 내 각 슬라이스에 대해
-                aug_k, aug_t = augmenter(
+                aug_k_complex, aug_t = augmenter(
                     kspace_slice=kspace_orig[i],
                     target_size=target_size,
                     current_epoch=epoch  # ✨ 현재 epoch 전달
                 )
-                kspace_batch.append(aug_k)
+                kspace_batch.append(torch.view_as_real(aug_k_complex))
                 target_batch.append(aug_t)
             
             # 증강된 슬라이스들을 다시 배치로 묶음.
