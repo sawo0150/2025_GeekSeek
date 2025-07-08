@@ -37,6 +37,7 @@ def train_epoch(args, epoch, model, data_loader, optimizer,
     # start_epoch = start_iter = time.perf_counter()
     len_loader = len(data_loader)
     total_loss = 0.
+    total_slices = 0
 
     pbar = tqdm(enumerate(data_loader),
                 total=len_loader,
@@ -105,14 +106,13 @@ def train_epoch(args, epoch, model, data_loader, optimizer,
                 optimizer.step()
         
         # -------- SSIM Metric (no grad) ----------------------------------
-        # with torch.no_grad():
-        #     ssim_val = 1 - ssim_loss_gpu(output.detach(), target, maximum).item()
         loss_vals = current_loss.detach().cpu().tolist()                # list of floats, len=
         with torch.no_grad():
             ssim_loss_vals = ssim_metric(output.detach(), target, maximum, cats)
             ssim_vals = [1.0 - v for v in ssim_loss_vals]
 
         total_loss += sum(loss_vals)
+        total_slices += len(loss_vals)
 
         # --- tqdm & ETA ---------------------------------------------------
         batch_mean = sum(loss_vals) / len(loss_vals)
@@ -128,7 +128,7 @@ def train_epoch(args, epoch, model, data_loader, optimizer,
     # return total_loss, time.perf_counter() - start_epoch
 
     epoch_time = time.perf_counter() - start_iter
-    return total_loss / len_loader, epoch_time
+    return total_loss / total_slices, epoch_time
 
 
 def validate(args, model, data_loader, acc_val, epoch, loss_type, ssim_metric):
@@ -234,7 +234,11 @@ def train(args):
     loss_cfg = getattr(args, "LossFunction", {"_target_": "utils.common.loss_function.SSIMLoss"})
     loss_type = instantiate(OmegaConf.create(loss_cfg)).to(device=device)
     # SSIM metric 계산용 (항상 SSIM 기반 로그를 위해 별도 생성)
-    ssim_metric = SSIMLoss().to(device=device)
+    mask_th = {  'brain_x4': 5e-5,
+                    'brain_x8': 5e-5,
+                    'knee_x4':  2e-5,
+                    'knee_x8':  2e-5}
+    ssim_metric = SSIMLoss(mask_only = True, mask_threshold=mask_th).to(device=device)
 
     # ── 1. Optimizer 선택 (fallback: Adam) ─────────────────────────────
     optim_cfg = getattr(args, "optimizer", None)

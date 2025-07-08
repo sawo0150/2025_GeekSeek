@@ -3,5 +3,5 @@ win_size: 7
 k1: 0.01
 k2: 0.03
 mask_threshold: ${data.mask_thresholds}
-mask_only: true
+mask_only: false
 region_weight: false

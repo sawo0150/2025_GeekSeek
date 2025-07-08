@@ -2,9 +2,11 @@ import h5py, re
 import random
 from utils.data.transforms import DataTransform, CenterCropOrPad
 from torch.utils.data import Dataset, DataLoader
-from hydra.utils import instantiate
+from hydra.utils import instantiate, get_class
 from pathlib import Path
 import numpy as np
+from torch.utils.data import default_collate
+from torch.utils.data.sampler import BatchSampler
 
 # +++ custom multi-input Compose +++
 class MultiCompose:
@@ -54,6 +56,19 @@ class SliceData(Dataset):
             self.kspace_examples += [
                 (fname, slice_ind, cat) for slice_ind in range(num_slices)
             ]
+
+        # --- coil_counts 미리 계산 ---
+        # 파일 단위로 한 번씩만 열어서, self.input_key의 두 번째 차원이 C(coils)인 걸 이용
+        coil_map = {}
+        for fname, _, _ in self.kspace_examples:
+            key = str(fname)
+            if key not in coil_map:
+                with h5py.File(fname, 'r') as hf:
+                    arr = hf[self.input_key]
+                    # arr.shape == (num_slices, C, H, W) 라고 가정
+                    coil_map[key] = arr.shape[1]
+        # 인덱스 순서대로 coil count 리스트
+        self.coil_counts = [coil_map[str(f)] for f, _, _ in self.kspace_examples]
 
 
     def _get_metadata(self, fname):
@@ -130,17 +145,33 @@ def create_data_loaders(data_path, args, shuffle=False, isforward=False):
         forward = isforward
     )
 
-    from .collator import DynamicCompressCollator
-    collate_fn = DynamicCompressCollator(args.compress)
+    # 1) collate_fn
+    collate_fn = instantiate(args.collator, _recursive_=False)
 
-    data_loader = DataLoader(
-        dataset=data_storage,
+    # 2) sampler 인스턴스 하나만 만들기
+    sampler = instantiate(
+        args.sampler,
+        data_source=data_storage,
+        coil_counts=getattr(data_storage, "coil_counts", None),
         batch_size=args.batch_size,
         shuffle=shuffle,
-        num_workers=args.num_workers,
-        collate_fn=collate_fn
+        _recursive_=False
     )
-    return data_loader
 
-
-
+    # 3) DataLoader 에 넘겨줄 인자 결정
+    #    sampler 가 BatchSampler 계열이면 batch_sampler=, 아니면 sampler= 로
+    if isinstance(sampler, BatchSampler):
+        return DataLoader(
+            dataset=data_storage,
+            batch_sampler=sampler,
+            num_workers=args.num_workers,
+            collate_fn=collate_fn
+        )
+    else:
+        return DataLoader(
+            dataset=data_storage,
+            sampler=sampler,
+            batch_size=args.batch_size,
+            num_workers=args.num_workers,
+            collate_fn=collate_fn
+        )

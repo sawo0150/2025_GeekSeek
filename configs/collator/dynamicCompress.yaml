@@ -1,0 +1,2 @@
+_target_: utils.data.collator.DynamicCompressCollator
+compressor: ${compressor}              # ${...} 를 train.yaml 의 compressor 섹션으로 바인딩
