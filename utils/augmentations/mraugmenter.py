@@ -20,13 +20,14 @@ class MRAugmenter:
     MRI k-space 데이터에 대해 물리적 특성을 고려한 데이터 증강을 수행하는 클래스.
     각 증강 기법이 별도의 메서드로 분리되어 모듈성이 향상되었습니다.
     """
-
-    def __init__(self, config):
+    def __init__(self, aug_on, aug_delay, max_epochs, aug_strength, aug_schedule,
+                aug_exp_decay, weight_dict, max_rotation_angle, scale_range):
+        
         """
         MRAugmenter를 초기화합니다.
 
         Args:
-            config (object): 증강 관련 하이퍼파라미터를 담고 있는 설정 객체.
+         (object): 증강 관련 하이퍼파라미터를 담고 있는 설정 객체.
                              필요한 속성:
                              - aug_on (bool): 증강 사용 여부
                              - aug_delay (int): 증강 시작 전 딜레이 에포크
@@ -39,23 +40,34 @@ class MRAugmenter:
                              - max_rotation_angle (float): 최대 회전 각도 (도 단위)
                              - scale_range (tuple): 확대/축소 비율 범위 (e.g., (0.8, 1.2))
         """
-        self.config = config
+        """ MRAugmenter를 초기화합니다. (Hydra에 최적화됨) """
+        # 모든 파라미터를 self에 저장
+        self.aug_on = aug_on
+        self.aug_delay = aug_delay
+        self.max_epochs = max_epochs
+        self.aug_strength = aug_strength
+        self.aug_schedule = aug_schedule
+        self.aug_exp_decay = aug_exp_decay
+        self.weight_dict = weight_dict
+        self.max_rotation_angle = max_rotation_angle
+        self.scale_range = scale_range
+        
         self.rng = np.random.RandomState()
 
     def schedule_p(self, current_epoch):
         """현재 에포크에 따라 증강 확률(p)을 계산합니다."""
-        if not self.config.aug_on:
+        if not self.aug_on:
             return 0.0
 
         t = current_epoch
-        D = self.config.aug_delay
-        T = self.config.max_epochs
-        p_max = self.config.aug_strength
+        D = self.aug_delay
+        T = self.max_epochs
+        p_max = self.aug_strength
 
         if t < D:
             return 0.0
 
-        schedule = self.config.aug_schedule
+        schedule = self.aug_schedule
         if schedule == 'constant':
             p = p_max
         elif schedule == 'ramp':
@@ -63,7 +75,7 @@ class MRAugmenter:
         elif schedule == 'exp':
             if T <= D:
                 return p_max
-            c = self.config.aug_exp_decay
+            c = self.aug_exp_decay
             p = p_max * (1 - exp(-c * (t - D) / (T - D))) / (1 - exp(-c))
         else:
             raise ValueError(f"알 수 없는 스케줄 방식입니다: {schedule}")
@@ -72,7 +84,7 @@ class MRAugmenter:
 
     def _random_apply(self, transform_name, p):
         """주어진 확률(p)과 가중치에 따라 변환 적용 여부를 결정합니다."""
-        weight = self.config.weight_dict.get(transform_name, 0.0)
+        weight = self.weight_dict.get(transform_name, 0.0)
         return self.rng.uniform() < (weight * p)
 
     def _fft(self, image):
@@ -102,7 +114,7 @@ class MRAugmenter:
 
     def _transform_rotate(self, image_tensor):
         """회전. 복소수 텐서를 입력받아 처리하며, 물리적 타당성을 위해 보간을 포함합니다."""
-        angle = self.rng.uniform(-self.config.max_rotation_angle, self.config.max_rotation_angle)
+        angle = self.rng.uniform(-self.max_rotation_angle, self.max_rotation_angle)
         
         img_real_view = torch.view_as_real(image_tensor).permute(0, 3, 1, 2).reshape(-1, image_tensor.shape[-2], image_tensor.shape[-1])
         rotated_real_view = TF.rotate(img_real_view, angle, interpolation=BILINEAR)
@@ -112,7 +124,7 @@ class MRAugmenter:
     def _transform_scale(self, image_tensor):
         """확대/축소. 복소수 텐서를 입력받아 처리하며, 물리적 타당성을 위해 보간을 포함합니다."""
         C, H, W = image_tensor.shape
-        scale_factor = self.rng.uniform(*self.config.scale_range)
+        scale_factor = self.rng.uniform(*self.scale_range)
         
         new_H, new_W = int(H * scale_factor), int(W * scale_factor)
 
@@ -203,23 +215,23 @@ class MRAugmenter:
     
 
 
-class Config:
-    def __init__(self):
-        self.aug_on = True
-        self.max_epochs = 100
-        self.aug_delay = 10
-        self.aug_strength = 0.9
-        self.aug_schedule = 'ramp'
-        self.aug_exp_decay = 6.0
+# class Config:
+#     def __init__(self):
+#         self.aug_on = True
+#         self.max_epochs = 100
+#         self.aug_delay = 10
+#         self.aug_strength = 0.9
+#         self.aug_schedule = 'ramp'
+#         self.aug_exp_decay = 6.0
         
-        # 각 증강에 대한 가중치 설정 (새로운 증강 'rotate', 'scale' 추가)
-        self.weight_dict = {
-            'fliph': 0.0,
-            'flipv': 0.0,
-            'rotate': 1.0,
-            'scale': 1.0,
-        }
+#         # 각 증강에 대한 가중치 설정 (새로운 증강 'rotate', 'scale' 추가)
+#         self.weight_dict = {
+#             'fliph': 0.0,
+#             'flipv': 0.0,
+#             'rotate': 1.0,
+#             'scale': 1.0,
+#         }
         
-        # 새로운 증강을 위한 하이퍼파라미터
-        self.max_rotation_angle = 15.0  # 최대 15도까지 회전
-        self.scale_range = (0.85, 1.15) # 85% ~ 115% 크기로 확대/축소
+#         # 새로운 증강을 위한 하이퍼파라미터
+#         self.max_rotation_angle = 15.0  # 최대 15도까지 회전
+#         self.scale_range = (0.85, 1.15) # 85% ~ 115% 크기로 확대/축소

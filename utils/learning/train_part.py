@@ -32,7 +32,7 @@ import os
 
 def train_epoch(args, epoch, model, data_loader, optimizer,
                 loss_type, ssim_metric, metricLog_train,
-                scaler, amp_enabled, accum_steps):
+                scaler, amp_enabled, accum_steps, augmenter):
     model.train()
     # start_epoch = start_iter = time.perf_counter()
     len_loader = len(data_loader)
@@ -46,6 +46,31 @@ def train_epoch(args, epoch, model, data_loader, optimizer,
 
     start_iter = time.perf_counter()
     for iter, data in pbar:
+        # 데이터 증강 적용
+        if augmenter is not None:
+            # 데이터로더에서 나온 배치(B, C, H, W)를 순회하며 증강 적용
+            kspace_batch, target_batch = [], []
+            # data에서 kspace와 target 추출 (프로젝트 구조에 맞게 키 이름 수정 필요)
+            kspace_orig, target_orig = data['kspace'], data['target']
+
+            # crop_size는 args 또는 data에서 가져와야 합니다.
+            # 예시: target_size = (args.crop_size[0], args.crop_size[1])
+            target_size = (target_orig.shape[-2], target_orig.shape[-1])
+
+            for i in range(kspace_orig.shape[0]): # 배치 내 각 슬라이스에 대해
+                aug_k, aug_t = augmenter(
+                    kspace_slice=kspace_orig[i],
+                    target_size=target_size,
+                    current_epoch=epoch  # ✨ 현재 epoch 전달
+                )
+                kspace_batch.append(aug_k)
+                target_batch.append(aug_t)
+            
+            # 증강된 슬라이스들을 다시 배치로 묶음
+            data['kspace'] = torch.stack(kspace_batch)
+            data['target'] = torch.stack(target_batch)
+
+
         mask, kspace, target, maximum, fnames, _, cats = data
         mask = mask.cuda(non_blocking=True)
         kspace = kspace.cuda(non_blocking=True)
@@ -222,6 +247,15 @@ def train(args):
         optimizer = torch.optim.Adam(model.parameters(), args.lr)
     print(f"[Hydra] Optimizer ▶ {optimizer.__class__.__name__}")
 
+    # ✨ Augmenter 객체 생성
+    augmenter = None
+    if getattr(args, "aug", None):
+        print("[Hydra] Augmenter를 생성합니다.")
+        # args.aug에 mraugment.yaml에서 읽은 설정이 들어있습니다.
+        augmenter = instantiate(args.aug)
+
+
+
     # ── Resume logic (이제 model, optimizer가 정의된 이후) ──
     start_epoch   = 0
     best_val_loss = float('inf')
@@ -270,7 +304,8 @@ def train(args):
         train_loss, train_time = train_epoch(args, epoch, model,
                                              train_loader, optimizer,
                                              loss_type, ssim_metric, MetricLog_train,
-                                             scaler, amp_enabled, accum_steps)
+                                             scaler, amp_enabled, accum_steps,
+                                             augmenter)
         val_loss, num_subjects, reconstructions, targets, inputs, val_time = validate(args, model, val_loader,
                                                                                         MetricLog_val, epoch,
                                                                                         loss_type, ssim_metric)

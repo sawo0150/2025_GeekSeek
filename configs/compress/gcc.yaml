@@ -1,5 +1,11 @@
 # configs/compress/gcc.yaml
-_target_: utils.data.coil_compression.GCCCompressor
+
+# Hydra가 이 파일을 읽어 어떤 파이썬 클래스를 객체로 만들지 지정합니다.
+_target_: utils.data.transforms.GCCTransform
+
+# GCCTransform.__init__의 파라미터들을 그대로 가져옵니다.
 target_coils: 4
 num_calib_lines: 24
 sliding_window_size: 5
+use_aligned_gcc: true
+crop_size: [320, 320] # YAML에서는 튜플을 리스트로 표현
