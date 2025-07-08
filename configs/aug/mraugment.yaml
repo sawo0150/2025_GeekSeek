@@ -1,30 +1,20 @@
-# aug_on: 증강을 켤지 여부
+_target_: utils.augmentations.mraugmentater
+
+# MRAugmenter.__init__ 에 전달될 파라미터들
 aug_on: true
-
-# aug_delay: 증강을 시작하기 전 대기할 에폭 수
 aug_delay: 10
-
-# max_epochs: 총 학습 에폭 수 (train.yaml과 동기화 필요!!!!!)
-max_epochs: 100
-
-# aug_strength: 증강의 최대 강도 (p_max)
+max_epochs: ${num_epochs}      # train.yaml의 num_epochs 값을 그대로 가져와 사용
 aug_strength: 0.9
-
-# aug_schedule: 증강 확률 스케줄 방식 ('constant', 'ramp', 'exp')
-aug_schedule: 'exp'
-
-# aug_exp_decay: 'exp' 스케줄 사용 시 감쇠 계수
+aug_schedule: 'ramp'        # 'constant', 'ramp', 'exp' 중 선택
 aug_exp_decay: 6.0
 
-# weight_dict: 각 증강 기법의 가중치
+# 각 증강 기법의 적용 가중치 (0.0 ~ 1.0)
 weight_dict:
-  fliph: 0.0
-  flipv: 0.0
+  fliph: 0.5
+  flipv: 0.5
   rotate: 1.0
   scale: 1.0
 
-# max_rotation_angle: 최대 회전 각도 (도)
+# 회전 및 스케일 관련 하이퍼파라미터
 max_rotation_angle: 15.0
-
-# scale_range: 확대/축소 범위 (리스트 형식으로 입력)
 scale_range: [0.85, 1.15]
