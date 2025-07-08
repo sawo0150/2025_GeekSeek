@@ -41,6 +41,7 @@ class SCCCompressor(BaseCompressor):
     def __init__(self, target_coils: int = 4):
         super().__init__(target_coils)
 
+    # @profile  # <-- line_profiler 이 읽는 어노테이션
     def compress(self, kspace: np.ndarray, attrs: dict) -> np.ndarray:
         # 1) (C, H, W) → (C, H*W)
         C, H, W = kspace.shape

@@ -137,8 +137,8 @@ class DataTransform:
             kspace = torch.view_as_real(to_tensor(kspace).to(torch.complex64))
         H = kspace.shape[-2]
 
-        print(mask.shape)
-        print(kspace.shape)
+        # print(mask.shape)
+        # print(kspace.shape)
 
         mask = mask.reshape(1, 1, H, 1).float().byte()
         return mask, kspace, target, maximum, fname, slice
