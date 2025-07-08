@@ -66,7 +66,7 @@ def train_epoch(args, epoch, model, data_loader, optimizer,
                 kspace_batch.append(aug_k)
                 target_batch.append(aug_t)
             
-            # 증강된 슬라이스들을 다시 배치로 묶음
+            # 증강된 슬라이스들을 다시 배치로 묶음.
             data['kspace'] = torch.stack(kspace_batch)
             data['target'] = torch.stack(target_batch)
 
