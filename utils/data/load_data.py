@@ -101,7 +101,7 @@ def create_data_loaders(data_path, args, shuffle=False, isforward=False):
 
     # (0) Dynamic augmentation (추후 통합 예정)
     # # aug_tr = instantiate(args.aug)
-    #     # aug_tr,   # TODO: MRaugment 통합 시 여기에 추가
+    #     # aug_tr,   # TODO: MRaugment 통합 시 여기에 추가  현재 epoch를 받아야 해서 train_epoch 내부에서 처리
 
     # (1) Mask 적용 및 k-space numpy 반환
     from utils.data.transforms import MaskApplyTransform
@@ -111,9 +111,10 @@ def create_data_loaders(data_path, args, shuffle=False, isforward=False):
     if getattr(args, 'use_crop', False):
         transforms.append(CenterCropOrPad(target_size=tuple(args.crop_size)))
 
-    # (3) Coil compression (토글)
-    comp_tr = instantiate(args.compress)
-    transforms.append(comp_tr)
+    # # (3) Coil compression (토글)
+    # if getattr(args, "compress", None):
+    #     comp_tr = instantiate(args.compress)
+    #     transforms.append(comp_tr)
 
     # (4) Tensor 변환 및 real/imag 스택
     transforms.append(DataTransform(isforward, max_key_))
@@ -129,10 +130,17 @@ def create_data_loaders(data_path, args, shuffle=False, isforward=False):
         forward = isforward
     )
 
+    from .collator import DynamicCompressCollator
+    collate_fn = DynamicCompressCollator(args.compress)
+
     data_loader = DataLoader(
         dataset=data_storage,
         batch_size=args.batch_size,
         shuffle=shuffle,
-        num_workers=args.num_workers
+        num_workers=args.num_workers,
+        collate_fn=collate_fn
     )
     return data_loader
+
+
+
