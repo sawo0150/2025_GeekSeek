@@ -11,7 +11,7 @@ class MultiCompose:
     """
     mask, kspace, target, attrs, fname, slice 6-tuple을
     self.transforms 리스트에 있는 transform들에
-    차례대로 넘겨주고 최종 결과를 리턴합니다.
+    차례대로 넘겨주고 최종 결과를 리턴합니다..
     """
     def __init__(self, transforms):
         self.transforms = transforms
