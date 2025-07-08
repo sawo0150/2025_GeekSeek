@@ -10,12 +10,12 @@ defaults:
   - compress: scc  # ⬅️ 새로 추가
 
 # === Data Preprocessing === -  Mask → Crop → Compress → Tensor
-use_crop: true                  # spatial crop 사용 여부
+use_crop: false                  # spatial crop 사용 여부
 crop_size: [384, 384]           # crop 할 (H, W) - 무조건 짝수로 지정
 
 # === 공통 학습 하이퍼파라미터 ===
 GPU_NUM: 0
-batch_size: 2
+batch_size: 1
 num_epochs: 1
 lr: 1e-3
 report_interval: 500
