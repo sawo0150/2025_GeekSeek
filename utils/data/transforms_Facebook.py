@@ -2,8 +2,21 @@ import numpy as np
 import torch
 from typing import Dict, NamedTuple, Optional, Sequence, Tuple, Union
 from utils.data.subsample import MaskFunc
-from utils.data.transforms import to_tensor
 import fastmri
+
+
+def to_tensor(data):
+    """
+    Convert numpy array to PyTorch tensor. For complex arrays, the real and imaginary parts
+    are stacked along the last dimension.
+    Args:
+        data (np.array): Input numpy array
+    Returns:
+        torch.Tensor: PyTorch version of data
+    """
+    if isinstance(data, torch.Tensor):
+        return data
+    return torch.as_tensor(data)
 
 
 def tensor_to_complex_np(data: torch.Tensor) -> np.ndarray:

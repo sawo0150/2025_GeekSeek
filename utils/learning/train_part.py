@@ -46,8 +46,6 @@ def train_epoch(args, epoch, model, data_loader, optimizer,
 
     start_iter = time.perf_counter()
     for iter, data in pbar:
-
-    # for iter, data in enumerate(data_loader):
         mask, kspace, target, maximum, fnames, _, cats = data
         mask = mask.cuda(non_blocking=True)
         kspace = kspace.cuda(non_blocking=True)
@@ -58,9 +56,12 @@ def train_epoch(args, epoch, model, data_loader, optimizer,
             output = model(kspace, mask)
             
         # pass cats list so MaskedLoss can pick per-cat thresholds
-        current_loss   = loss_type(output, target, maximum, cats)
-        loss = current_loss/accum_steps
-        # print("max alloc MB:", torch.cuda.max_memory_allocated() / 1024**2)
+        # 1) per-sample loss 텐서 [B]
+        current_loss = loss_type(output, target, maximum, cats)
+        # 2) backward 에는 스칼라 평균을 사용
+        loss = current_loss.mean() / accum_steps
+
+        print("max alloc MB:", torch.cuda.max_memory_allocated() / 1024**2)
         # ─── Accumulation ──────────────────────────────────────────────
         if iter % accum_steps == 0:
             optimizer.zero_grad(set_to_none=True)
@@ -81,19 +82,23 @@ def train_epoch(args, epoch, model, data_loader, optimizer,
         # -------- SSIM Metric (no grad) ----------------------------------
         # with torch.no_grad():
         #     ssim_val = 1 - ssim_loss_gpu(output.detach(), target, maximum).item()
+        loss_vals = current_loss.detach().cpu().tolist()                # list of floats, len=
         with torch.no_grad():
-            ssim_loss_val = ssim_metric(output.detach(), target, maximum, cats)
-            ssim_val      = 1 - ssim_loss_val.item()
+            ssim_loss_vals = ssim_metric(output.detach(), target, maximum, cats)
+            ssim_vals = [1.0 - v for v in ssim_loss_vals]
 
-        loss_val = current_loss.item()
-        total_loss += loss_val
+        total_loss += sum(loss_vals)
 
         # --- tqdm & ETA ---------------------------------------------------
-        avg = (time.perf_counter() - start_iter) / (iter + 1)
-        pbar.set_postfix(loss=f"{current_loss.item():.4g}")
+        batch_mean = sum(loss_vals) / len(loss_vals)
+        pbar.set_postfix(loss=f"{batch_mean:.4g}")
 
-        # --- 카테고리별 누적 ---------------------------------------------
-        metricLog_train.update(loss_val, ssim_val, cats)
+        # --- 카테고리별 & slice 별 누적 -------------------------------------
+        # MetricAccumulator.update(loss: float, ssim: float, cats: list[str])
+        # 여기서는 샘플별로 호출해서, 각 slice 로깅
+        for lv, sv, cat in zip(loss_vals, ssim_vals, cats):
+            metricLog_train.update(lv, sv, [cat])
+
     # total_loss = total_loss / len_loader
     # return total_loss, time.perf_counter() - start_epoch
 

@@ -183,10 +183,20 @@ class L1Loss(MaskedLoss):
                  region_weight: bool = False):
         super().__init__(mask_threshold, mask_only, region_weight)
     
+    # def compute_loss(self, output, target, data_range):
+    #     # data_range 를 반영해 loss를 정규화
+    #     d = float(data_range) if data_range is not None else 1.0
+    #     return F.l1_loss(output, target) / d
     def compute_loss(self, output, target, data_range):
-        # data_range 를 반영해 loss를 정규화
-        d = float(data_range) if data_range is not None else 1.0
-        return F.l1_loss(output, target) / d
+        # data_range 반영 (스칼라 혹은 배치 텐서 모두 지원)
+        if data_range is None:
+            d = 1.0
+        elif isinstance(data_range, torch.Tensor):
+            # [B] -> [B,1,1,...]로 브로드캐스트 준비
+            d = data_range.view(-1, *([1] * (output.dim() - 1)))
+        else:
+            d = float(data_range)
+        return F.l1_loss(output, target, reduction='none') / d
 
 
 class SSIMLoss(MaskedLoss):
@@ -222,7 +232,16 @@ class SSIMLoss(MaskedLoss):
         else:
             raise NotImplementedError(f"SSIM expects 2D or 3D tensor, got {output.shape}")
 
-        d = float(data_range) if data_range is not None else 1.0
+        # print(data_range)
+        # d = float(data_range) if data_range is not None else 1.0
+        # data_range 반영 (스칼라 혹은 배치 텐서)
+        if data_range is None:
+            d = 1.0
+        elif isinstance(data_range, torch.Tensor):
+            d = data_range.view(-1,1,1,1)
+        else:
+            d = float(data_range)
+
         C1 = (self.k1 * d) ** 2
         C2 = (self.k2 * d) ** 2
         ux  = F.conv2d(X, self.w)
@@ -238,7 +257,9 @@ class SSIMLoss(MaskedLoss):
         B1 = ux * ux + uy * uy + C1
         B2 = vx + vy + C2
         S = (A1 * A2) / (B1 * B2)
-        return 1.0 - S.mean()
+        # return 1.0 - S.mean()
+        # per-sample SSIM loss 반환
+        return (1.0 - S).view(S.size(0), -1).mean(dim=1)
 
 
 class MSSSIMLoss(MaskedLoss):
@@ -269,9 +290,19 @@ class MSSSIMLoss(MaskedLoss):
         else:
             raise NotImplementedError
         
-        dr = float(data_range) if data_range is not None else self.data_range
-        return 1.0 - ms_ssim(X, Y, data_range=dr, size_average=self.size_average)
+        # dr = float(data_range) if data_range is not None else self.data_range
+        # return 1.0 - ms_ssim(X, Y, data_range=dr, size_average=self.size_average)
 
+        # data_range 반영
+        if data_range is None:
+            dr = self.data_range
+        elif isinstance(data_range, torch.Tensor):
+            dr = data_range
+        else:
+            dr = float(data_range)
+        # ms-ssim을 per-sample로 계산
+        loss = 1.0 - ms_ssim(X, Y, data_range=dr, size_average=self.size_average)
+        return loss.view(loss.size(0))
 
 
 class PSNRLoss(MaskedLoss):
@@ -288,9 +319,18 @@ class PSNRLoss(MaskedLoss):
         super().__init__(mask_threshold, mask_only, region_weight)
         self.data_range = data_range
 
+    # def compute_loss(self, output, target, data_range):
+    #     mse = F.mse_loss(output, target)
+    #     psnr = 10 * torch.log10(self.data_range ** 2 / (mse + 1e-12))
+    #     return -psnr
+    
     def compute_loss(self, output, target, data_range):
-        mse = F.mse_loss(output, target)
-        psnr = 10 * torch.log10(self.data_range ** 2 / (mse + 1e-12))
+        # MSE per-sample 계산
+        mse = F.mse_loss(output, target, reduction='none')
+        mse = mse.view(mse.size(0), -1).mean(dim=1)
+        # data_range는 인스턴스 변수 혹은 파라미터 우선
+        dr = self.data_range if data_range is None else (data_range if isinstance(data_range, torch.Tensor) else float(data_range))
+        psnr = 10 * torch.log10(dr ** 2 / (mse + 1e-12))
         return -psnr
 
 
@@ -310,12 +350,26 @@ class SSIML1Loss(MaskedLoss):
         self.weight_ssim = weight_ssim
         self.weight_l1 = weight_l1
 
+    # def compute_loss(self, output, target, data_range):
+    #     # 1) SSIM part (unchanged)
+    #     ssim_loss = self.ssim_base.compute_loss(output, target, data_range)
+    #     # 2) L1 part: data_range 로 정규화
+    #     d = float(data_range) if data_range is not None else 1.0
+    #     l1_loss = F.l1_loss(output, target) / d
+    #     return self.weight_ssim * ssim_loss + self.weight_l1 * l1_loss
+
     def compute_loss(self, output, target, data_range):
-        # 1) SSIM part (unchanged)
+        # 1) SSIM part (per-sample)
         ssim_loss = self.ssim_base.compute_loss(output, target, data_range)
-        # 2) L1 part: data_range 로 정규화
-        d = float(data_range) if data_range is not None else 1.0
-        l1_loss = F.l1_loss(output, target) / d
+        # 2) L1 part: 스칼라/텐서 data_range 모두 지원
+        if data_range is None:
+            d = 1.0
+        elif isinstance(data_range, torch.Tensor):
+            d = data_range.view(-1, *([1] * (output.dim() - 1)))
+        else:
+            d = float(data_range)
+        l1 = F.l1_loss(output, target, reduction='none') / d
+        l1_loss = l1.view(l1.size(0), -1).mean(dim=1)
         return self.weight_ssim * ssim_loss + self.weight_l1 * l1_loss
 
 class MSSSIML1Loss(MaskedLoss):
@@ -345,9 +399,24 @@ class MSSSIML1Loss(MaskedLoss):
             Y = target.unsqueeze(0).unsqueeze(0)
         else:
             raise NotImplementedError
-        dr = float(data_range) if data_range is not None else self.data_range
+        # dr = float(data_range) if data_range is not None else self.data_range
+        # ms_loss = 1.0 - ms_ssim(X, Y, data_range=dr, size_average=self.size_average)
+
+        # data_range 반영
+        if data_range is None:
+            dr = self.data_range
+        elif isinstance(data_range, torch.Tensor):
+            dr = data_range
+        else:
+            dr = float(data_range)
         ms_loss = 1.0 - ms_ssim(X, Y, data_range=dr, size_average=self.size_average)
+        ms_loss = ms_loss.view(ms_loss.size(0))
 
         # 2) L1 part: data_range 로 정규화
-        l1_loss = F.l1_loss(output, target) / dr
+        # l1_loss = F.l1_loss(output, target) / dr
+        # return self.weight_ms_ssim * ms_loss + self.weight_l1 * l1_loss
+    
+        # L1 part
+        l1 = F.l1_loss(output, target, reduction='none') / dr
+        l1_loss = l1.view(l1.size(0), -1).mean(dim=1)
         return self.weight_ms_ssim * ms_loss + self.weight_l1 * l1_loss

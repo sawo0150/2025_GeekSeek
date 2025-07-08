@@ -1,11 +1,27 @@
 import h5py, re
 import random
-from utils.data.transforms import DataTransform
+from utils.data.transforms import DataTransform, CenterCropOrPad
 from torch.utils.data import Dataset, DataLoader
 from hydra.utils import instantiate
 from pathlib import Path
 import numpy as np
-from torchvision.transforms import Compose  # 간단한 파이프라인용
+
+# +++ custom multi-input Compose +++
+class MultiCompose:
+    """
+    mask, kspace, target, attrs, fname, slice 6-tuple을
+    self.transforms 리스트에 있는 transform들에
+    차례대로 넘겨주고 최종 결과를 리턴합니다.
+    """
+    def __init__(self, transforms):
+        self.transforms = transforms
+
+    def __call__(self, mask, kspace, target, attrs, fname, slice_idx):
+        for tr in self.transforms:
+            mask, kspace, target, attrs, fname, slice_idx = tr(
+                mask, kspace, target, attrs, fname, slice_idx
+            )
+        return mask, kspace, target, attrs, fname, slice_idx
 
 class SliceData(Dataset):
     def __init__(self, root, transform, input_key, target_key, forward=False):
@@ -81,22 +97,33 @@ def create_data_loaders(data_path, args, shuffle=False, isforward=False):
         max_key_ = -1
         target_key_ = -1
 
-    
-    # # 1) Coil compression transform
-    # comp_tr = instantiate(args.compress)    # args.compress 는 OmegaConf dict → Compressor 객체
+    transforms = []
 
-    # # 2) (기존) mask 적용 + to_tensor
-    # data_tr = DataTransform(isforward, args.max_key)
+    # (0) Dynamic augmentation (추후 통합 예정)
+    # # aug_tr = instantiate(args.aug)
+    #     # aug_tr,   # TODO: MRaugment 통합 시 여기에 추가
 
-    # # 3) (선택) MRaugment 같은 동적 증강
-    # aug_tr  = instantiate(args.aug)         # args.aug 역시 config 에서 지정
+    # (1) Mask 적용 및 k-space numpy 반환
+    from utils.data.transforms import MaskApplyTransform
+    transforms.append(MaskApplyTransform())
 
-    # # 4) Compose  
-    # transform = Compose([ comp_tr, data_tr, aug_tr ])
+    # (2) Spatial crop (토글)
+    if getattr(args, 'use_crop', False):
+        transforms.append(CenterCropOrPad(target_size=tuple(args.crop_size)))
+
+    # (3) Coil compression (토글)
+    comp_tr = instantiate(args.compress)
+    transforms.append(comp_tr)
+
+    # (4) Tensor 변환 및 real/imag 스택
+    transforms.append(DataTransform(isforward, max_key_))
+
+    transform = MultiCompose(transforms)
+
 
     data_storage = SliceData(
         root=data_path,
-        transform=DataTransform(isforward, max_key_),
+        transform=transform,
         input_key=args.input_key,
         target_key=target_key_,
         forward = isforward
@@ -106,5 +133,6 @@ def create_data_loaders(data_path, args, shuffle=False, isforward=False):
         dataset=data_storage,
         batch_size=args.batch_size,
         shuffle=shuffle,
+        num_workers=args.num_workers
     )
     return data_loader

@@ -17,6 +17,9 @@ class BaseCompressor(ABC):
         # 1) numpy로 받고
         kspace_np = kspace.numpy() if isinstance(kspace, torch.Tensor) else kspace
         # 2) 실제 압축
+        if kspace_np.ndim == 4 and kspace_np.shape[-1] == 2:
+            # real = kspace[..., 0], imag = kspace[..., 1]
+            kspace_np = kspace_np[...,0] + 1j * kspace_np[...,1]
         kspace_cmp = self.compress(kspace_np, attrs)
         # 3) torch Tensor로 복귀
         kspace_t = torch.from_numpy(kspace_cmp)
@@ -35,15 +38,21 @@ class IdentityCompressor(BaseCompressor):
 class SCCCompressor(BaseCompressor):
     def __init__(self, target_coils: int = 4):
         super().__init__(target_coils)
-    def compress(self, kspace, attrs):
-        # 간단 SVD-based coil compression 구현
-        c, h, w = kspace.shape
-        flat = kspace.reshape(c, -1)
+
+    def compress(self, kspace: np.ndarray, attrs: dict) -> np.ndarray:
+        # 1) (C, H, W) → (C, H*W)
+        C, H, W = kspace.shape
+        flat = kspace.reshape(C, -1)
+        # 2) SVD
         u, s, vh = np.linalg.svd(flat, full_matrices=False)
-        compressed = (u[:, : self.target_coils].T @ flat).reshape(
-            self.target_coils, h, w
-        )
-        return compressed
+        # 3) 상위 self.target_coils 개 프로젝션
+        u_reduced = u[:, : self.target_coils]            # (C, T)
+        compressed_flat = u_reduced.T @ flat             # (T, H*W)
+        # 4) (T, H, W) 로 복원
+        compressed = compressed_flat.reshape(self.target_coils, H, W)
+        # 5) 타입 복원 (optional)
+        return compressed.astype(kspace.dtype)
+
 
 
 class GCCCompressor(BaseCompressor):
