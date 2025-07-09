@@ -304,7 +304,7 @@ def train(args):
                                                                                         MetricLog_val, epoch,
                                                                                         loss_type, ssim_metric)
         # ✨ val_loss 기록 (스케줄러 및 체크포인트용)
-        val_loss_history.append(val_loss.item())
+        val_loss_history.append(val_loss)
 
         val_loss_log = np.append(val_loss_log, np.array([[epoch, val_loss]]), axis=0)
         file_path = os.path.join(args.val_loss_dir, "val_loss_log")
