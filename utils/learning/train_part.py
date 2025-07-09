@@ -32,7 +32,7 @@ import os
 
 def train_epoch(args, epoch, model, data_loader, optimizer,
                 loss_type, ssim_metric, metricLog_train,
-                scaler, amp_enabled, accum_steps, augmenter):
+                scaler, amp_enabled, accum_steps):
     model.train()
     # start_epoch = start_iter = time.perf_counter()
     len_loader = len(data_loader)
@@ -47,31 +47,6 @@ def train_epoch(args, epoch, model, data_loader, optimizer,
 
     start_iter = time.perf_counter()
     for iter, data in pbar:
-        # 데이터 증강 적용
-        if augmenter is not None:
-            # 데이터로더에서 나온 배치(B, C, H, W)를 순회하며 증강 적용
-            kspace_batch, target_batch = [], []
-            # data에서 kspace와 target 추출 (프로젝트 구조에 맞게 키 이름 수정 필요)
-            kspace_orig, target_orig = data['kspace'], data['target']
-
-            # crop_size는 args 또는 data에서 가져와야 합니다.
-            # 예시: target_size = (args.crop_size[0], args.crop_size[1])
-            target_size = (target_orig.shape[-2], target_orig.shape[-1])
-
-            for i in range(kspace_orig.shape[0]): # 배치 내 각 슬라이스에 대해
-                aug_k_complex, aug_t = augmenter(
-                    kspace_slice=kspace_orig[i],
-                    target_size=target_size,
-                    current_epoch=epoch  # ✨ 현재 epoch 전달
-                )
-                kspace_batch.append(torch.view_as_real(aug_k_complex))
-                target_batch.append(aug_t)
-            
-            # 증강된 슬라이스들을 다시 배치로 묶음.
-            data['kspace'] = torch.stack(kspace_batch)
-            data['target'] = torch.stack(target_batch)
-
-
         mask, kspace, target, maximum, fnames, _, cats = data
         mask = mask.cuda(non_blocking=True)
         kspace = kspace.cuda(non_blocking=True)
@@ -263,18 +238,21 @@ def train(args):
     # ── Resume logic (이제 model, optimizer가 정의된 이후) ──
     start_epoch   = 0
     best_val_loss = float('inf')
+    val_loss_history = [] # val loss기록 for augmenter
+
     if getattr(args, 'resume_checkpoint', None):
-        ckpt = torch.load(
-            args.resume_checkpoint,
-            map_location=device,
-            weights_only=False
-        )
+        ckpt = torch.load(args.resume_checkpoint, map_location=device, weights_only=False)
         model.load_state_dict(ckpt['model'])
         optimizer.load_state_dict(ckpt['optimizer'])
-        best_val_loss = ckpt.get('best_val_loss', best_val_loss)
-        start_epoch   = ckpt.get('epoch', 0)
-        print(f"[Resume] Loaded '{args.resume_checkpoint}' → "
-              f"epoch {start_epoch}, best_val_loss={best_val_loss:.4f}")
+        best_val_loss = ckpt.get('best_val_loss', float('inf'))
+        start_epoch = ckpt.get('epoch', 0)
+        val_loss_history = ckpt.get('val_loss_history', []) # 체크포인트에서 기록 복원
+        print(f"[Resume] Loaded '{args.resume_checkpoint}' → epoch {start_epoch}, best_val_loss={best_val_loss:.4f}")
+        # 재개 시, augmenter의 상태도 복원
+        if augmenter:
+            augmenter.val_loss_history.clear()
+            augmenter.val_loss_history.extend(val_loss_history)
+            print(f"[Resume] Augmenter val_loss history 복원 완료 ({len(val_loss_history)}개 항목)")
 
     # ▸ 2. AMP scaler (옵션)
     scaler = GradScaler(enabled=amp_enabled)
@@ -295,8 +273,10 @@ def train(args):
 
     print(args.data_path_train)
     print(args.data_path_val)
-    train_loader = create_data_loaders(data_path = args.data_path_train, args = args, shuffle=True)
-    val_loader = create_data_loaders(data_path = args.data_path_val, args = args)
+
+
+    # train_loader = create_data_loaders(data_path = args.data_path_train, args = args, shuffle=True) # 매 에폭마다 생성 예정
+    val_loader = create_data_loaders(data_path=args.data_path_val, args=args, augmenter=None)
     
     val_loss_log = np.empty((0, 2))
 
@@ -305,14 +285,26 @@ def train(args):
         MetricLog_val   = MetricAccumulator("val")
         print(f'Epoch #{epoch:2d} ............... {args.net_name} ...............')
 
+        if augmenter is not None:
+            last_val_loss = val_loss_history[-1] if val_loss_history else None
+            augmenter.update_state(current_epoch=epoch, val_loss=last_val_loss)
+
+        train_loader = create_data_loaders(
+            data_path=args.data_path_train, 
+            args=args, 
+            shuffle=True, 
+            augmenter=augmenter # 업데이트된 augmenter 전달
+        )
+
         train_loss, train_time = train_epoch(args, epoch, model,
                                              train_loader, optimizer,
                                              loss_type, ssim_metric, MetricLog_train,
-                                             scaler, amp_enabled, accum_steps,
-                                             augmenter)
+                                             scaler, amp_enabled, accum_steps)
         val_loss, num_subjects, reconstructions, targets, inputs, val_time = validate(args, model, val_loader,
                                                                                         MetricLog_val, epoch,
                                                                                         loss_type, ssim_metric)
+        # ✨ val_loss 기록 (스케줄러 및 체크포인트용)
+        val_loss_history.append(val_loss.item())
 
         val_loss_log = np.append(val_loss_log, np.array([[epoch, val_loss]]), axis=0)
         file_path = os.path.join(args.val_loss_dir, "val_loss_log")
@@ -326,7 +318,20 @@ def train(args):
         is_new_best = val_loss < best_val_loss
         best_val_loss = min(best_val_loss, val_loss)
 
-        save_model(args, args.exp_dir, epoch + 1, model, optimizer, best_val_loss, is_new_best)
+        # ✨ save_model에 val_loss_history 추가 (상태 저장을 위해)
+        checkpoint = {
+            'epoch': epoch + 1,
+            'args': args,
+            'model': model.state_dict(),
+            'optimizer': optimizer.state_dict(),
+            'best_val_loss': best_val_loss,
+            'exp_dir': str(args.exp_dir),
+            'val_loss_history': val_loss_history 
+        }
+        torch.save(checkpoint, args.exp_dir / 'model.pt')
+
+        if is_new_best:
+            shutil.copyfile(args.exp_dir / 'model.pt', args.exp_dir / 'best_model.pt')
         
         # ──────────── LR 스케줄러 업데이트 ────────────
         if scheduler is not None:

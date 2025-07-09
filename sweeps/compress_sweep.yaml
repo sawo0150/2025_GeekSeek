@@ -1,0 +1,30 @@
+# sweeps/compress_sweep.yaml
+
+method: grid
+name: compress-gcc-vs-scc-2025
+
+metric:
+  name: val_ssim
+  goal: maximize
+
+parameters:
+  # ✨ 'compress'를 'compressor'로 수정
+  compressor:
+    values:
+      - gcc
+      - scc
+      - none
+
+  # 다른 파라미터는 그대로 유지
+  model:
+    values: [varnet_small]
+  optimizer:
+    values: [adamw]
+
+program: sweeps/entry.py
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - ${args}
