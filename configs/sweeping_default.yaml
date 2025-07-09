@@ -17,12 +17,12 @@ crop_size: [384, 384]           # crop 할 (H, W) - 무조건 짝수로 지정
 
 # === 공통 학습 하이퍼파라미터 ===
 GPU_NUM: 0
-batch_size: 4
-num_epochs: 1
+batch_size: 11
+num_epochs: 30
 lr: 1e-3
 report_interval: 500
 seed: 430
-num_workers: 6
+num_workers: 11
 
 exp_name : small_varnet_resume_test
 
