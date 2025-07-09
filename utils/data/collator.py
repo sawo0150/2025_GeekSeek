@@ -75,11 +75,11 @@ class DynamicCompressCollator:
             mask_p, kspace_p, target_p, attrs_p, fname_p, slice_idx_p = processed_sample
 
             # 이제 tensor만 shape 출력
-            print(f"mask_p:  {mask_p.shape}")
-            print(f"kspace_p:{kspace_p.shape}")
-            print(f"target_p:{target_p.shape}")
+            # print(f"mask_p:  {mask_p.shape}")
+            # print(f"kspace_p:{kspace_p.shape}")
+            # print(f"target_p:{target_p.shape}")
             # attrs_p, fname_p, slice_idx_p 는 텐서가 아닐 수 있으니
-            print(f"attrs_p type: {type(attrs_p)}, fname_p: {fname_p}, slice_idx_p: {slice_idx_p}")
+            # print(f"attrs_p type: {type(attrs_p)}, fname_p: {fname_p}, slice_idx_p: {slice_idx_p}")
 
             # 원래 튜플의 마지막 요소였던 category('cat')를 다시 붙여줍니다.
             processed_batch.append((*processed_sample, sample[-1]))
