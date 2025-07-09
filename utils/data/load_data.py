@@ -104,7 +104,7 @@ class SliceData(Dataset):
         return (*sample, cat)
 
 
-def create_data_loaders(data_path, args, shuffle=False, isforward=False):
+def create_data_loaders(data_path, args, shuffle=False, isforward=False, augmenter=None):
     if isforward == False:
         max_key_ = args.max_key
         target_key_ = args.target_key
@@ -114,9 +114,9 @@ def create_data_loaders(data_path, args, shuffle=False, isforward=False):
 
     transforms = []
 
-    # (0) Dynamic augmentation (추후 통합 예정)
-    # # aug_tr = instantiate(args.aug)
-    #     # aug_tr,   # TODO: MRaugment 통합 시 여기에 추가  현재 epoch를 받아야 해서 train_epoch 내부에서 처리
+    # (0) MRaugment
+    if augmenter is not None and not isforward:
+        transforms.append(augmenter)
 
     # (1) Mask 적용 및 k-space numpy 반환
     from utils.data.transforms import MaskApplyTransform
