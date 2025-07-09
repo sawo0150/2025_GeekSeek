@@ -12,7 +12,7 @@ import cv2
 from typing import List, Union, Mapping
 
 try:
-    from pytorch_msssim import ms_ssim
+    from pytorch_msssim import MS_SSIM, ms_ssim
     _MS_SSIM_AVAILABLE = True
 except ImportError:
     _MS_SSIM_AVAILABLE = False
@@ -85,11 +85,19 @@ class MaskedLoss(nn.Module):
         # 3) compute base loss
         loss = self.compute_loss(output, target, data_range)
 
-        # 4) apply region_weight: scale by mask coverage
+        # # 4) apply region_weight: scale by mask coverage
+        # if mask is not None and self.region_weight:
+        #     w = mask.sum(dim=[1,2]) / (mask.shape[1]*mask.shape[2])  # [B]
+        #     # 배치별로 적용하려면
+        #     loss = (loss.view(-1) * w).mean()  # compute_loss must return per-sample loss tensor
+
+    
+        # 4) apply region_weight: scale each sample's loss by mask coverage (per-sample 벡터 유지)
         if mask is not None and self.region_weight:
-            w = mask.sum(dim=[1,2]) / (mask.shape[1]*mask.shape[2])  # [B]
-            # 배치별로 적용하려면
-            loss = (loss.view(-1) * w).mean()  # compute_loss must return per-sample loss tensor
+            # mask.sum → [B], 영역 비율
+            w = mask.sum(dim=[1,2]) / (mask.shape[1] * mask.shape[2])
+            # per-sample loss 벡터에 가중치 곱하기
+            loss = loss.view(-1) * w
 
         return loss
 
@@ -183,20 +191,20 @@ class L1Loss(MaskedLoss):
                  region_weight: bool = False):
         super().__init__(mask_threshold, mask_only, region_weight)
     
-    # def compute_loss(self, output, target, data_range):
-    #     # data_range 를 반영해 loss를 정규화
-    #     d = float(data_range) if data_range is not None else 1.0
-    #     return F.l1_loss(output, target) / d
     def compute_loss(self, output, target, data_range):
-        # data_range 반영 (스칼라 혹은 배치 텐서 모두 지원)
+        # 1) data_range 반영 (스칼라/텐서 모두 지원)
         if data_range is None:
             d = 1.0
         elif isinstance(data_range, torch.Tensor):
-            # [B] -> [B,1,1,...]로 브로드캐스트 준비
             d = data_range.view(-1, *([1] * (output.dim() - 1)))
         else:
             d = float(data_range)
-        return F.l1_loss(output, target, reduction='none') / d
+
+        # 2) 픽셀별 L1 차이 계산
+        per_pixel = F.l1_loss(output, target, reduction='none') / d
+
+        # 3) 배치별 평균 → [B] 크기의 텐서 반환
+        return per_pixel.view(per_pixel.size(0), -1).mean(dim=1)
 
 
 class SSIMLoss(MaskedLoss):
@@ -261,48 +269,60 @@ class SSIMLoss(MaskedLoss):
         # per-sample SSIM loss 반환
         return (1.0 - S).view(S.size(0), -1).mean(dim=1)
 
-
 class MSSSIMLoss(MaskedLoss):
     """
     MS-SSIM loss (1 - MS-SSIM) with optional masking.
-    Requires pytorch_msssim.
+    Uses functional ms_ssim for dynamic data_range.
     """
     def __init__(self,
                  data_range: float = 1.0,
-                 size_average: bool = True,
-                 mask_threshold: Union[float, Mapping[str, float]] = None,
-                 mask_only: bool = False,
-                 region_weight: bool = False):
-        
+                 size_average: bool = False,   # per-sample loss를 원하면 False
+                 mask_threshold=None,
+                 mask_only=False,
+                 region_weight=False):
         super().__init__(mask_threshold, mask_only, region_weight)
         if not _MS_SSIM_AVAILABLE:
-            raise ImportError("pytorch_msssim is required for MSSSIMLoss")
-        self.data_range = data_range
+            raise ImportError("pytorch_msssim이 필요합니다.")
+        self.data_range   = data_range
         self.size_average = size_average
 
     def compute_loss(self, output, target, data_range):
-        if output.ndim == 3:
-            X = output.unsqueeze(1)
-            Y = target.unsqueeze(1)
-        elif output.ndim == 2:
+        # 1) [B,H,W] or [H,W] → [B,1,H,W]
+        if output.dim() == 3:
+            X, Y = output.unsqueeze(1), target.unsqueeze(1)
+        elif output.dim() == 2:
             X = output.unsqueeze(0).unsqueeze(0)
             Y = target.unsqueeze(0).unsqueeze(0)
         else:
-            raise NotImplementedError
-        
-        # dr = float(data_range) if data_range is not None else self.data_range
-        # return 1.0 - ms_ssim(X, Y, data_range=dr, size_average=self.size_average)
+            raise NotImplementedError(f"Unsupported shape {output.shape}")
 
-        # data_range 반영
-        if data_range is None:
-            dr = self.data_range
-        elif isinstance(data_range, torch.Tensor):
-            dr = data_range
-        else:
-            dr = float(data_range)
-        # ms-ssim을 per-sample로 계산
-        loss = 1.0 - ms_ssim(X, Y, data_range=dr, size_average=self.size_average)
-        return loss.view(loss.size(0))
+        # 2) 동적 data_range 반영
+        dr = data_range if data_range is not None else self.data_range
+        if isinstance(dr, torch.Tensor):
+            dr = float(dr.view(-1)[0])
+
+        # 3) 필요하다면 패딩 (멀티스케일 크기 불일치 방지)
+        #    기본 levels=5 → 2^(5-1)=16 배수로 맞추기
+        B, C, H, W = X.shape
+        pad_H = (16 - H % 16) % 16
+        pad_W = (16 - W % 16) % 16
+        if pad_H or pad_W:
+            X = F.pad(X, (0, pad_W, 0, pad_H), mode='reflect')
+            Y = F.pad(Y, (0, pad_W, 0, pad_H), mode='reflect')
+
+        # 4) ms_ssim 함수로 계산
+        loss = 1.0 - ms_ssim(
+            X, Y,
+            data_range=dr,
+            size_average=self.size_average,
+            win_size=11  # 기본 윈도우 크기
+        )
+
+        # 5) 스칼라가 나온 경우 대비 → 항상 (B,) 형태로
+        if loss.dim() == 0:
+            loss = loss.unsqueeze(0).expand(B)
+
+        return loss
 
 
 class PSNRLoss(MaskedLoss):
@@ -372,11 +392,60 @@ class SSIML1Loss(MaskedLoss):
         l1_loss = l1.view(l1.size(0), -1).mean(dim=1)
         return self.weight_ssim * ssim_loss + self.weight_l1 * l1_loss
 
+# class MSSSIML1Loss(MaskedLoss):
+#     """Combined MS-SSIM + L1 loss with optional masking and weighting."""
+#     def __init__(self,
+#                  data_range: float = 1.0,
+#                  size_average: bool = True,
+#                  weight_ms_ssim: float = 1.0,
+#                  weight_l1: float = 1.0,
+#                  mask_threshold: Union[float, Mapping[str, float]] = None,
+#                  mask_only: bool = False,
+#                  region_weight: bool = False):
+#         super().__init__(mask_threshold, mask_only, region_weight)
+#         if not _MS_SSIM_AVAILABLE:
+#             raise ImportError("pytorch_msssim is required for MSSSIML1Loss")
+#         self.data_range = data_range
+#         self.size_average = size_average
+#         self.weight_ms_ssim = weight_ms_ssim
+#         self.weight_l1 = weight_l1
+
+#     def compute_loss(self, output, target, data_range):
+#         # 1) MS-SSIM part
+#         if output.ndim == 3:
+#             X = output.unsqueeze(1);  Y = target.unsqueeze(1)
+#         elif output.ndim == 2:
+#             X = output.unsqueeze(0).unsqueeze(0)
+#             Y = target.unsqueeze(0).unsqueeze(0)
+#         else:
+#             raise NotImplementedError
+#         # dr = float(data_range) if data_range is not None else self.data_range
+#         # ms_loss = 1.0 - ms_ssim(X, Y, data_range=dr, size_average=self.size_average)
+
+#         # data_range 반영
+#         if data_range is None:
+#             dr = self.data_range
+#         elif isinstance(data_range, torch.Tensor):
+#             dr = data_range
+#         else:
+#             dr = float(data_range)
+#         ms_loss = 1.0 - ms_ssim(X, Y, data_range=dr, size_average=self.size_average)
+#         ms_loss = ms_loss.view(ms_loss.size(0))
+
+#         # 2) L1 part: data_range 로 정규화
+#         # l1_loss = F.l1_loss(output, target) / dr
+#         # return self.weight_ms_ssim * ms_loss + self.weight_l1 * l1_loss
+    
+#         # L1 part
+#         l1 = F.l1_loss(output, target, reduction='none') / dr
+#         l1_loss = l1.view(l1.size(0), -1).mean(dim=1)
+#         return self.weight_ms_ssim * ms_loss + self.weight_l1 * l1_loss
+
 class MSSSIML1Loss(MaskedLoss):
     """Combined MS-SSIM + L1 loss with optional masking and weighting."""
     def __init__(self,
                  data_range: float = 1.0,
-                 size_average: bool = True,
+                 size_average: bool = False,
                  weight_ms_ssim: float = 1.0,
                  weight_l1: float = 1.0,
                  mask_threshold: Union[float, Mapping[str, float]] = None,
@@ -384,39 +453,31 @@ class MSSSIML1Loss(MaskedLoss):
                  region_weight: bool = False):
         super().__init__(mask_threshold, mask_only, region_weight)
         if not _MS_SSIM_AVAILABLE:
-            raise ImportError("pytorch_msssim is required for MSSSIML1Loss")
-        self.data_range = data_range
-        self.size_average = size_average
+            raise ImportError("pytorch_msssim이 필요합니다.")
+        # base MS-SSIM loss
+        self.msssim_base = MSSSIMLoss(
+            data_range=data_range,
+            size_average=size_average,
+            mask_threshold=mask_threshold,
+            mask_only=mask_only,
+            region_weight=region_weight
+        )
         self.weight_ms_ssim = weight_ms_ssim
         self.weight_l1 = weight_l1
 
     def compute_loss(self, output, target, data_range):
-        # 1) MS-SSIM part
-        if output.ndim == 3:
-            X = output.unsqueeze(1);  Y = target.unsqueeze(1)
-        elif output.ndim == 2:
-            X = output.unsqueeze(0).unsqueeze(0)
-            Y = target.unsqueeze(0).unsqueeze(0)
-        else:
-            raise NotImplementedError
-        # dr = float(data_range) if data_range is not None else self.data_range
-        # ms_loss = 1.0 - ms_ssim(X, Y, data_range=dr, size_average=self.size_average)
+        # 1) MS-SSIM part via base class
+        ms_loss = self.msssim_base.compute_loss(output, target, data_range)
 
-        # data_range 반영
+        # 2) L1 part: normalize by data_range
         if data_range is None:
-            dr = self.data_range
+            dr = 1.0
         elif isinstance(data_range, torch.Tensor):
-            dr = data_range
+            dr = data_range.view(-1, *([1] * (output.dim() - 1)))
         else:
             dr = float(data_range)
-        ms_loss = 1.0 - ms_ssim(X, Y, data_range=dr, size_average=self.size_average)
-        ms_loss = ms_loss.view(ms_loss.size(0))
+        per_pixel = F.l1_loss(output, target, reduction='none') / dr
+        l1_loss = per_pixel.view(per_pixel.size(0), -1).mean(dim=1)
 
-        # 2) L1 part: data_range 로 정규화
-        # l1_loss = F.l1_loss(output, target) / dr
-        # return self.weight_ms_ssim * ms_loss + self.weight_l1 * l1_loss
-    
-        # L1 part
-        l1 = F.l1_loss(output, target, reduction='none') / dr
-        l1_loss = l1.view(l1.size(0), -1).mean(dim=1)
+        # 3) Combined weighted sum
         return self.weight_ms_ssim * ms_loss + self.weight_l1 * l1_loss

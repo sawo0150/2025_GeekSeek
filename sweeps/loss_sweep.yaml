@@ -2,12 +2,12 @@
 # wandb sweep sweeps/loss_sweep.yaml  
 
 method: grid
-name: loss×mask×region_grid_2025
+name: loss×mask×region_grid_2025_a100
 
 # 실험할 파라미터
 parameters:
   loss_function:
-    values: [SSIM, "SSIM+L1", L1Loss, "MS_SSIM + L1", MS_SSIM, PSNR]
+    values: [SSIM, "SSIM+L1", L1Loss, "MS_SSIM+L1", MS_SSIM, PSNR]
   mask_only:
     values: [true, false]
   region_weight:

@@ -5,4 +5,4 @@ weight_ms_ssim: 1.0
 weight_l1: 1.0
 mask_threshold: ${data.mask_thresholds}
 mask_only: true
-region_weight: false
+region_weight: true

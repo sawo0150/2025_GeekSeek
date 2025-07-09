@@ -1,4 +1,4 @@
 _target_: utils.common.loss_function.L1Loss
 mask_threshold: ${data.mask_thresholds}   # data 쪽에 미리 threshold 맵을 정의해주세요
-mask_only: false
-region_weight: false
+mask_only: true
+region_weight: true

@@ -1,0 +1,9 @@
+data_path_train: /home/introai7/.bin/.fmri/data1/train
+data_path_val:   /home/introai7/.bin/.fmri/data1/val
+PROJECT_ROOT: /home/introai7/.bin/.fmri
+
+mask_thresholds:
+  brain_x4: 5e-5
+  brain_x8: 5e-5
+  knee_x4:  2e-5
+  knee_x8:  2e-5
