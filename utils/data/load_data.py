@@ -128,7 +128,7 @@ def create_data_loaders(data_path, args, shuffle=False, isforward=False, augment
 
     # (3) Coil compression (토글)
     if getattr(args, "compressor", None):
-        comp_tr = instantiate(args.compress)
+        comp_tr = instantiate(args.compressor)
         transforms.append(comp_tr)
 
     # (4) Tensor 변환 및 real/imag 스택
