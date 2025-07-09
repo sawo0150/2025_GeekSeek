@@ -13,7 +13,6 @@ parameters:
     values:
       - gcc
       - scc
-      - none
 
   # 다른 파라미터는 그대로 유지
   model:

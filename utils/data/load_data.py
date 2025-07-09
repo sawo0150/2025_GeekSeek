@@ -126,10 +126,10 @@ def create_data_loaders(data_path, args, shuffle=False, isforward=False, augment
     if getattr(args, 'use_crop', False):
         transforms.append(CenterCropOrPad(target_size=tuple(args.crop_size)))
 
-    # (3) Coil compression (토글)
-    if getattr(args, "compressor", None):
-        comp_tr = instantiate(args.compressor)
-        transforms.append(comp_tr)
+    # # (3) Coil compression (토글)
+    # if getattr(args, "compressor", None):
+    #     comp_tr = instantiate(args.compressor)
+    #     transforms.append(comp_tr)
 
     # (4) Tensor 변환 및 real/imag 스택
     transforms.append(DataTransform(isforward, max_key_))
