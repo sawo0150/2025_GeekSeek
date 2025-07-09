@@ -6,13 +6,6 @@ from collections import defaultdict
 from torch.utils.data.dataloader import default_collate
 import random
 
-# class IdentityCollator:
-#     """
-#     그냥 default_collate(batch) 를 호출하는 래퍼.
-#     Hydra instantiate 로 안전하게 사용할 수 있습니다.
-#     """
-#     def __call__(self, batch):
-#         return torch.utils.data.dataloader.default_collate(batch)
     
 class IdentityCollator:
     """
