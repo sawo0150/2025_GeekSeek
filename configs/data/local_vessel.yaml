@@ -1,5 +1,6 @@
 data_path_train: /root/Data/train/
 data_path_val:   /root/Data/val/
+data_path_eval: /root/Data/leaderboard/
 PROJECT_ROOT: /root/
 
 

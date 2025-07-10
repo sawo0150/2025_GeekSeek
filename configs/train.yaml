@@ -1,14 +1,15 @@
 defaults:
   - _self_
   - model: varnet_small   # 모델 설정
-  - data: local_gpu         # 데이터 경로 설정
-  # - LRscheduler: CosineAnnealingLR        # ⬅️  추가 - https://gaussian37.github.io/dl-pytorch-lr_scheduler/참고
+  - data: local_sangwonDesktop         # 데이터 경로 설정
+  - LRscheduler: CosineAnnealingLR        # ⬅️  추가 - https://gaussian37.github.io/dl-pytorch-lr_scheduler/참고
   - LossFunction: MS_SSIM+L1
   - training: base
+  - evaluation: leaderboard
   - optimizer: adamw          # ⬅️ 새로 추가  
-  # - aug: mraugment    # ⬅️ 새로 추가
-  - collator: dynamicCompress          # 또는 dynamicCompress or identity or identity_debug
-  - compressor: none  # ⬅️ 새로 추가       # gcc, scc, none
+  - aug: mraugment    # ⬅️ 새로 추가
+  - collator: identity          # 또는 dynamicCompress or identity or identity_debug
+  - compressor: scc  # ⬅️ 새로 추가       # gcc, scc, none
   - sampler: grouping          # 또는 grouping or identity
 
 # === Data Preprocessing === -  Mask → Crop → Compress → Tensor
@@ -17,7 +18,7 @@ crop_size: [384, 384]           # crop 할 (H, W) - 무조건 짝수로 지정
 
 # === 공통 학습 하이퍼파라미터 ===
 GPU_NUM: 0
-batch_size: 11
+batch_size: 4
 num_epochs: 20
 lr: 1e-3
 report_interval: 500

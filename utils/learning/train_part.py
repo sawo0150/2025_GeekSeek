@@ -22,6 +22,7 @@ from torch.nn import Module
 
 from collections import defaultdict
 from utils.data.load_data import create_data_loaders
+from utils.learning.leaderboard_eval_part import run_leaderboard_eval
 from utils.logging.metric_accumulator import MetricAccumulator
 from utils.logging.vis_logger import log_epoch_samples
 from utils.common.utils import save_reconstructions, ssim_loss, ssim_loss_gpu
@@ -112,6 +113,7 @@ def validate(args, model, data_loader, acc_val, epoch, loss_type, ssim_metric):
     targets = defaultdict(dict)
     start = time.perf_counter()
     total_loss = 0.0
+    total_ssim = 0.0
     n_slices   = 0
     
     len_loader = len(data_loader)                 # ← 전체 길이
@@ -157,6 +159,7 @@ def validate(args, model, data_loader, acc_val, epoch, loss_type, ssim_metric):
                 # -------------- SSIM metric 계산 ---------------
                 ssim_loss_i = ssim_metric(out_slice, tgt_slice, max_i, cats[i]).item()
                 ssim_i = 1 - ssim_loss_i
+                total_ssim += ssim_i
                 acc_val.update(loss_i, ssim_i, [cats[i]])
 
     for fname in reconstructions:
@@ -172,9 +175,10 @@ def validate(args, model, data_loader, acc_val, epoch, loss_type, ssim_metric):
     # num_subjects = len(reconstructions)
     
     metric_loss = total_loss / n_slices        # ← leaderboard 방식 (Slice 별 평균)
+    metric_ssim = total_ssim / n_slices        # ← leaderboard 방식 (Slice 별 평균)
     
 
-    return metric_loss, n_slices, reconstructions, targets, None, time.perf_counter() - start
+    return metric_loss, metric_ssim, n_slices, reconstructions, targets, None, time.perf_counter() - start
 
 def save_model(args, exp_dir, epoch, model, optimizer, best_val_loss, is_new_best):
     
@@ -238,6 +242,7 @@ def train(args):
     # ── Resume logic (이제 model, optimizer가 정의된 이후) ──
     start_epoch   = 0
     best_val_loss = float('inf')
+    best_val_ssim = 0.0
     val_loss_history = [] # val loss기록 for augmenter
 
     if getattr(args, 'resume_checkpoint', None):
@@ -245,6 +250,7 @@ def train(args):
         model.load_state_dict(ckpt['model'])
         optimizer.load_state_dict(ckpt['optimizer'])
         best_val_loss = ckpt.get('best_val_loss', float('inf'))
+        best_val_ssim = ckpt.get('best_val_ssim', 0.0)
         start_epoch = ckpt.get('epoch', 0)
         val_loss_history = ckpt.get('val_loss_history', []) # 체크포인트에서 기록 복원
         print(f"[Resume] Loaded '{args.resume_checkpoint}' → epoch {start_epoch}, best_val_loss={best_val_loss:.4f}")
@@ -269,11 +275,21 @@ def train(args):
     else:
         scheduler = None
 
-    best_val_loss = 10000.
-
     print(args.data_path_train)
     print(args.data_path_val)
 
+    # ───────────────── evaluation 서브트리 언랩 ─────────────────
+    # ①  args.evaluation 이 이미 {"enable": …} 형태라면 그대로 사용
+    # ②  args.evaluation 이 {"evaluation": {...}} 처럼 한 번 더
+    #     래핑돼 있으면 내부 dict 를 꺼낸다.
+    _raw_eval = getattr(args, "evaluation", {})
+    eval_cfg  = _raw_eval.get("evaluation", _raw_eval)
+
+    lb_enable = eval_cfg.get("enable", False)
+    lb_every  = eval_cfg.get("every_n_epochs", 999_999)   # 기본 매우 크게
+
+    print(f"[Hydra-eval] {eval_cfg}")
+    print(f"[Hydra-eval] lb_enable={lb_enable}, lb_every={lb_every}")
 
     # train_loader = create_data_loaders(data_path = args.data_path_train, args = args, shuffle=True) # 매 에폭마다 생성 예정
     val_loader = create_data_loaders(data_path=args.data_path_val, args=args, augmenter=None)
@@ -300,7 +316,7 @@ def train(args):
                                              train_loader, optimizer,
                                              loss_type, ssim_metric, MetricLog_train,
                                              scaler, amp_enabled, accum_steps)
-        val_loss, num_subjects, reconstructions, targets, inputs, val_time = validate(args, model, val_loader,
+        val_loss,val_ssim, num_subjects, reconstructions, targets, inputs, val_time = validate(args, model, val_loader,
                                                                                         MetricLog_val, epoch,
                                                                                         loss_type, ssim_metric)
         # ✨ val_loss 기록 (스케줄러 및 체크포인트용)
@@ -315,8 +331,10 @@ def train(args):
         val_loss = torch.tensor(val_loss).cuda(non_blocking=True)
         num_subjects = torch.tensor(num_subjects).cuda(non_blocking=True)
 
-        is_new_best = val_loss < best_val_loss
+        # is_new_best = val_loss < best_val_loss
+        is_new_best = val_ssim > best_val_ssim
         best_val_loss = min(best_val_loss, val_loss)
+        best_val_ssim = max(best_val_ssim, val_ssim)
 
         # ✨ save_model에 val_loss_history 추가 (상태 저장을 위해)
         checkpoint = {
@@ -324,6 +342,7 @@ def train(args):
             'args': args,
             'model': model.state_dict(),
             'optimizer': optimizer.state_dict(),
+            'best_val_ssim': best_val_ssim,
             'best_val_loss': best_val_loss,
             'exp_dir': str(args.exp_dir),
             'val_loss_history': val_loss_history 
@@ -355,10 +374,34 @@ def train(args):
             if is_new_best:
                 wandb.save(str(args.exp_dir / "best_model.pt"))
 
+        # ───────── Leaderboard 평가 트리거 ─────────
+        if lb_enable and (epoch + 1) % lb_every == 0:
+            print(f"[LeaderBoard] Epoch {epoch+1}: reconstruct & eval 시작")
+            t0 = time.perf_counter()
+            ssim = run_leaderboard_eval(
+                model_ckpt_dir=args.exp_dir,
+                leaderboard_root=Path(eval_cfg["leaderboard_root"]),
+                gpu=args.GPU_NUM,
+                batch_size=eval_cfg["batch_size"],
+                output_key=eval_cfg["output_key"],
+            )
+            dt = time.perf_counter() - t0
+            print(f"[LeaderBoard] acc4={ssim['acc4']:.4f}  acc8={ssim['acc8']:.4f}  "
+                  f"mean={ssim['mean']:.4f}  ({dt/60:.1f} min)")
+
+            # ─ W&B 로깅 ─
+            if getattr(args, "use_wandb", False) and wandb:
+                wandb.log({
+                    "leaderboard/ssim_acc4": ssim["acc4"],
+                    "leaderboard/ssim_acc8": ssim["acc8"],
+                    "leaderboard/ssim_mean": ssim["mean"],
+                    "leaderboard/epoch":     epoch,
+                    "leaderboard/time_min":  dt/60,
+                }, step=epoch)
                                 
         print(
             f'Epoch = [{epoch:4d}/{args.num_epochs:4d}] TrainLoss = {train_loss:.4g} '
-            f'ValLoss = {val_loss:.4g} TrainTime = {train_time:.4f}s ValTime = {val_time:.4f}s',
+            f'ValLoss = {val_loss:.4g} ValSSIM = {val_ssim:.4g} TrainTime = {train_time:.4f}s ValTime = {val_time:.4f}s',
         )
 
         if is_new_best:

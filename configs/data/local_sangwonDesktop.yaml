@@ -1,5 +1,6 @@
 data_path_train: /home/swpants05/Desktop/2025_FastMri/Data/train/
 data_path_val:   /home/swpants05/Desktop/2025_FastMri/Data/val/
+data_path_eval: /home/swpants05/Desktop/2025_FastMri/Data/leaderboard/
 PROJECT_ROOT: /home/swpants05/Desktop/2025_FastMri/
 
 mask_thresholds:
