@@ -7,6 +7,9 @@ aug_delay: 10               # 증강을 시작하기 전 대기할 에포크 수
 weight_dict:                # 각 증강 기법의 가중치
   fliph: 0.5
   flipv: 0.5
+
+
+  # 
   rotate: 1.0
   scale: 1.0
 
