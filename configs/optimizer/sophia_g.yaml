@@ -1,8 +1,0 @@
-# configs/optim/sophia_g.yaml
-# Sophia-G (Sophia: A Scalable Second-order Optimizer)
-# pip install sophia-opt
-_target_: sophia_opt.SophiaG   # ← 모듈명 변경
-lr: 2e-4
-betas: [0.965, 0.99]
-rho: 0.03
-weight_decay: 0.01

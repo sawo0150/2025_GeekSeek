@@ -1,6 +1,0 @@
-# configs/optim/nadam.yaml
-_target_: torch.optim.NAdam
-lr: 1e-3
-betas: [0.9, 0.999]
-weight_decay: 0.0
-momentum_decay: 4e-3   # 논문 기본값

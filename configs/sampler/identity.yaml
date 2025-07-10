@@ -1,2 +1,0 @@
-_target_: utils.data.sampler.IdentitySampler
-# shuffle 은 create_data_loaders 에서 override

@@ -1,6 +1,0 @@
-# configs/optim/adadelta.yaml
-_target_: torch.optim.Adadelta
-lr: 1.0                # Adadelta는 상대적 스케일, 보통 1.0
-rho: 0.9               # 감쇠 계수
-eps: 1e-6
-weight_decay: 0.0

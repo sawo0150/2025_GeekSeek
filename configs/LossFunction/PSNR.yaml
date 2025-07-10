@@ -1,5 +1,0 @@
-_target_: utils.common.loss_function.PSNRLoss
-data_range: 1.0
-mask_threshold: ${data.mask_thresholds}
-mask_only: true
-region_weight: false

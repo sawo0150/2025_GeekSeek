@@ -1,8 +1,0 @@
-# configs/optim/rmsprop.yaml
-_target_: torch.optim.RMSprop
-lr: 1e-3
-alpha: 0.99            # 이동평균 감쇠율
-momentum: 0.0
-eps: 1e-8              # 0-division 방지 상수
-weight_decay: 0.0
-centered: false        # True면 평균 제거한 버전

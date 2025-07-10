@@ -1,4 +1,0 @@
-# configs/compress/scc.yaml
-_target_: utils.data.coil_compression.SCCCompressor
-target_coils: auto
-# target_coils: 4

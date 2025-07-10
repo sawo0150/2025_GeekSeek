@@ -1,4 +1,0 @@
-# 압축 자체는 transform 단계로만 하고, collate는 그냥 default_collate
-_target_: utils.data.collator.IdentityCollator
-debug: true
-

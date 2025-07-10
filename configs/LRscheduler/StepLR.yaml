@@ -1,4 +1,0 @@
-# configs/scheduler/step.yaml
-_target_: torch.optim.lr_scheduler.StepLR
-step_size: 10
-gamma: 0.5

@@ -1,9 +1,0 @@
-_target_: utils.common.loss_function.SSIML1Loss
-win_size: 7
-k1: 0.01
-k2: 0.03
-weight_ssim: 1.0
-weight_l1: 1.0
-mask_threshold: ${data.mask_thresholds}
-mask_only: true
-region_weight: false

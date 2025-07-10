@@ -1,6 +1,0 @@
-# configs/optim/lion.yaml
-# pip install lion-pytorch
-_target_: lion_pytorch.Lion
-lr: 1e-4
-betas: [0.9, 0.99]     # Lion 논문 기본
-weight_decay: 0.02     # AdamW 대비 3-10배 ↑ 권장 :contentReference[oaicite:1]{index=1}
