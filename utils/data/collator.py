@@ -35,6 +35,8 @@ class DynamicCompressCollator:
         
         # target_coils가 'auto'가 아닐 경우, 미리 고정된 compressor를 생성합니다.
         if self.compress_cfg.target_coils != 'auto':
+            if not isinstance(self.compress_cfg.target_coils, int):
+                 raise ValueError(f"compressor.target_coils must be an integer or 'auto', but got {self.compress_cfg.target_coils}")
             self.static_compressor = instantiate(compressor)
         else:
             self.static_compressor = None
@@ -51,10 +53,9 @@ class DynamicCompressCollator:
             
             # print(f"✔️  [Collator] Dynamic compression: Target coils = {target_coils} for this batch.")
 
-            cfg = copy.deepcopy(self.compress_cfg)            
-            # current_cfg = self.compress_cfg.copy()
-            cfg.target_coils = target_coils
-            compressor = instantiate(cfg)
+            # ┕ [수정] cfg를 복사-수정하는 대신, instantiate에 직접 override 인자를 전달합니다.
+            #          이것이 더 안전하고 효율적인 방법입니다.
+            compressor = instantiate(self.compress_cfg, target_coils=target_coils)
 
         # 2. 결정된 compressor를 사용하여 배치 내 모든 샘플 처리
         processed_batch = []

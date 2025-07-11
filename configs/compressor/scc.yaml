@@ -1,4 +1,4 @@
-# configs/compress/scc.yaml
+# configs/compressor/scc.yaml
 _target_: utils.data.coil_compression.SCCCompressor
-target_coils: auto
-# target_coils: 4
+target_coils: auto # auto or 4, 8..
+num_calib_lines: 24 # ┕ [추가] SVD 계산에 사용할 k-space 중앙 라인 수
