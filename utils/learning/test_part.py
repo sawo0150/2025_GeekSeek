@@ -48,7 +48,7 @@ def forward(args):
     model.to(device=device)
     
     checkpoint = torch.load(args.exp_dir / 'best_model.pt', map_location='cpu', weights_only=False)
-    print("checkpoint_epoch : "checkpoint['epoch'], "best_val_loss : ", checkpoint['best_val_loss'].item())
+    print("checkpoint_epoch : ", checkpoint['epoch'], "best_val_loss : ", checkpoint['best_val_loss'].item())
     model.load_state_dict(checkpoint['model'])
     
     # print(args.batch_size)

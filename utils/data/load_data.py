@@ -3,6 +3,7 @@ import random
 from utils.data.transforms import DataTransform, CenterCropOrPad
 from torch.utils.data import Dataset, DataLoader
 from hydra.utils import instantiate, get_class
+from omegaconf import OmegaConf   # ← 추가
 from pathlib import Path
 import numpy as np
 from torch.utils.data import default_collate
@@ -89,25 +90,8 @@ class SliceData(Dataset):
         # 인덱스 순서대로 coil count 리스트
         self.coil_counts = [coil_map[str(entry[0])] for entry in self.kspace_examples]
 
-        # self.coil_counts = [coil_map[str(f)] for f, _, _ in self.kspace_examples]
-
-        # coil_map = {}
-        # for entry in self.kspace_examples:
-        #     fname = entry[0]              # 첫 원소만 사용
-        #     key = str(fname)
-        #     if key not in coil_map:
-        #         with h5py.File(fname, "r") as hf:
-        #             arr = hf[self.input_key]          # (S, C, H, W)
-        #             coil_map[key] = arr.shape[1]      # C = coils
-        # # 인덱스 순서에 맞춰 다시 나열
     def _get_metadata(self, fname):
         with h5py.File(fname, "r") as hf:
-        #     if self.input_key in hf.keys():
-        #         num_slices = hf[self.input_key].shape[0]
-        #     elif self.target_key in hf.keys():
-        #         num_slices = hf[self.target_key].shape[0]
-        # return num_slices
-    
             # (1) k-space 파일에는 self.input_key 가 반드시 있음
             if self.input_key in hf:
                 return hf[self.input_key].shape[0]
@@ -164,6 +148,11 @@ def create_data_loaders(data_path, args, shuffle=False, isforward=False, augment
     if augmenter is not None and not isforward:
         transforms.append(augmenter)
 
+    aug_cfg = getattr(args, "maskAugment", {"enable": False})
+    if aug_cfg.get("enable", False) and not isforward:
+        transforms.append(instantiate(aug_cfg))
+
+
     # (1) Mask 적용 및 k-space numpy 반환
     from utils.data.transforms import MaskApplyTransform
     transforms.append(MaskApplyTransform())
@@ -182,7 +171,6 @@ def create_data_loaders(data_path, args, shuffle=False, isforward=False, augment
 
     transform = MultiCompose(transforms)
 
-
     data_storage = SliceData(
         root=data_path,
         transform=transform,
@@ -190,6 +178,21 @@ def create_data_loaders(data_path, args, shuffle=False, isforward=False, augment
         target_key=target_key_,
         forward = isforward
     )
+
+    dup_cfg = getattr(args, "maskDuplicate", {"enable": False})
+    # print(dup_cfg)
+    if dup_cfg.get("enable", False) and not isforward:
+        # data_storage = instantiate(dup_cfg, base_ds=data_storage, _recursive_=False)
+
+        # ➊ enable 키만 제거한 임시 사본 생성
+        dup_cfg_clean = OmegaConf.create(
+            {k: v for k, v in dup_cfg.items() if k != "enable"}
+        )
+        # ➋ 깨끗한 사본으로 instantiation
+        data_storage = instantiate(dup_cfg_clean,
+                                base_ds=data_storage,
+                                _recursive_=False)
+
 
     # 1) collate_fn
     if isforward:                       # forward 모드 : 안전 collator

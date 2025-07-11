@@ -1,0 +1,39 @@
+enable: true
+_target_: utils.augmentations.maskaugmenter.MaskAugmenter
+
+# ---- 공통 스케줄러 (MRaugmenter와 동일) ------------------
+aug_on: true
+aug_strength: 0.9
+aug_delay: 5
+aug_schedule_mode: epoch
+aug_schedule_type: ramp
+max_epochs: ${num_epochs}
+val_loss_window_size: 5
+val_loss_grad_start: -0.05
+val_loss_grad_plateau: -0.001
+aug_exp_decay: 6.0
+
+# ---- MaskFunc 풀 ----------------------------------------
+# * key   : mask type  (subsample.py 의 create_mask_for_mask_type 인자)
+# * prob  : type 선택 확률 (가중치)  – 명시 안 하면 동일 가중치
+# * accel : 정수 or [list] or [min,max]   (min,max → 정수 랜덤)
+# * cf    : float or [list] or [min,max]  (min,max → 연속 랜덤)
+#           ─ cf = center_fraction
+mask_specs:
+  random:
+    prob: 0.4
+    accel: [4, 8]          # choices
+    cf:    [0.04, 0.12]    # 연속 범위
+  equispaced:
+    prob: 0.3
+    accel: [4, 8]
+    cf:    [0.03, 0.08]
+  equispaced_fraction:
+    prob: 0.15
+    accel: [4, 8]
+    cf:    [0.03, 0.08]
+  magic_fraction:
+    prob: 0.15
+    accel: 8               # 단일 값
+    cf:    0.04            # 단일 값
+allow_any_combination: true   # cf·accel 짝짓기 자유

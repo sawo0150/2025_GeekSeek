@@ -1,0 +1,25 @@
+enable: true
+_target_: utils.augmentations.maskaugmenter.MaskAugmenter
+
+# --- 스케줄 & 공통 파라미터 (MRaugmenter와 동일) ---
+aug_on: true
+aug_strength: 0.9
+aug_delay: 5
+aug_schedule_mode: epoch
+aug_schedule_type: ramp
+max_epochs: ${num_epochs}
+val_loss_window_size: 5
+val_loss_grad_start: -0.05
+val_loss_grad_plateau: -0.001
+aug_exp_decay: 6.0
+
+# --- 증강 가중치 (key = op 이름) ---
+weight_dict:
+  drop_lines: 1.0
+  center_jitter: 0.4
+
+# --- mask 풀 ---
+pool:
+  - {type: random, accel: 4, cf: 0.08}
+  - {type: random, accel: 8, cf: 0.04}
+  - {type: equispaced, accel: 8, cf: 0.04}

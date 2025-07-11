@@ -1,0 +1,14 @@
+enable: true
+_target_: utils.data.duplicate_dataset.DuplicateMaskDataset
+
+# 두 acceleration 및 매개변수 범위
+accel_cfgs:
+  - {accel: 4, cf: [0.07, 0.12], mask_type: random}
+  - {accel: 8, cf: [0.03, 0.06], mask_type: random}
+
+
+# accel_cfgs: List[Dict]
+#     └─ {accel: 4, cf: [0.07,0.12], mask_type: random}
+#         {accel: 8, cf: 0.04,       mask_type: equispaced}  
+
+allow_any_combination: true

@@ -36,7 +36,8 @@ def _flatten_cfg_to_args(cfg: DictConfig) -> SimpleNamespace:
             # special-case: dict를 '통째로' 보존할 키들
             PRESERVE = {"model", "data", "LRscheduler", "LossFunction", 
                         "optimizer", "compressor", "collator", "sampler",
-                        "evaluation"}
+                        "evaluation", "early_stop", "maskDuplicate","maskAugment"
+                        }
 
             # (1) 보존용 속성 먼저 세팅
             if prefix == "" and k in PRESERVE and isinstance(v, Mapping):

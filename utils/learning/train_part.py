@@ -205,6 +205,14 @@ def train(args):
     checkpointing = getattr(args, "training_checkpointing", False)
     amp_enabled   = getattr(args, "training_amp",           False)
 
+    early_cfg = getattr(args, "early_stop", {})
+    early_enabled = early_cfg.get("enable", False)
+    stage_table = {s["epoch"]: s["ssim"] for s in early_cfg.get("stages", [])}
+    # ex) {10:0.90, 20:0.95, 25:0.96}
+    print(f"[Hydra-eval] {early_cfg}")
+    print(f"[Hydra-eval] early_enabled={early_enabled}, stage_table={stage_table}")
+
+
     model = VarNet(num_cascades=args.cascade,
                    chans=args.chans,
                    sens_chans=args.sens_chans,
@@ -411,3 +419,12 @@ def train(args):
             print(
                 f'ForwardTime = {time.perf_counter() - start:.4f}s',
             )
+
+        # ────────── epoch 루프 내부, val 계산·로그 이후 ──────────
+        current_epoch = epoch + 1         # 사람 눈금 1-base
+        if early_enabled and current_epoch in stage_table:
+            req = stage_table[current_epoch]
+            if val_ssim < req:
+                print(f"[EarlyStop] Epoch {current_epoch}: "
+                    f"val_ssim={val_ssim:.4f} < target={req:.4f}. 학습 중단!")
+                break                     # for epoch 루프 탈출
