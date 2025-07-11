@@ -23,7 +23,8 @@ class MRAugmenter:
     def __init__(self, aug_on, aug_strength, aug_schedule_mode, aug_schedule_type,
                  aug_delay, max_epochs, aug_exp_decay,
                  val_loss_window_size, val_loss_grad_start, val_loss_grad_plateau,
-                 weight_dict, max_rotation_angle, scale_range):
+                 weight_dict, max_rotation_angle, scale_range,
+                 shift_extent, max_shear_angle):
         """
         MRAugmenter를 초기화합니다. (Hydra에 최적화됨)
 
@@ -41,6 +42,8 @@ class MRAugmenter:
             weight_dict (dict): 각 증강의 가중치
             max_rotation_angle (float): 최대 회전 각도
             scale_range (tuple): 확대/축소 비율 범위
+            shift_extent (float): 이동 증강의 표준편차 (픽셀 단위)
+            max_shear_angle (float): 전단 변환의 최대 각도 (도 단위)
         """
         # 모든 파라미터를 self에 저장
         self.aug_on = aug_on
@@ -56,6 +59,8 @@ class MRAugmenter:
         self.weight_dict = weight_dict
         self.max_rotation_angle = max_rotation_angle
         self.scale_range = scale_range
+        self.shift_extent = shift_extent
+        self.max_shear_angle = max_shear_angle
 
         self.rng = np.random.RandomState()
         
@@ -156,11 +161,41 @@ class MRAugmenter:
         cropped_real_view = TF.center_crop(resized_real_view, output_size=[H, W])
         return torch.view_as_complex(cropped_real_view.reshape(C, 2, H, W).permute(0, 2, 3, 1).contiguous())
 
+    def _transform_shift(self, image_tensor):
+        """정규분포에 따라 이미지 상하/좌우 순환 이동. 보간 없음."""
+        # self.shift_extent를 표준편차로 사용하여 이동 거리 샘플링
+        shift_y = self.rng.normal(0, self.shift_extent)
+        shift_x = self.rng.normal(0, self.shift_extent)
+        
+        # torch.roll은 정수형 입력을 받으므로 반올림
+        shifts = (int(round(shift_y)), int(round(shift_x)))
+        
+        # dims=(-2, -1)은 각각 H, W 차원을 의미
+        return torch.roll(image_tensor, shifts=shifts, dims=(-2, -1))
+
+    # ┕ [추가] 전단(Shear) 변환 메서드
+    def _transform_shear(self, image_tensor):
+        """이미지를 평행사변형으로 변환. 보간 사용."""
+        # -max_shear_angle ~ +max_shear_angle 범위에서 전단 각도 샘플링
+        shear_angle = self.rng.uniform(-self.max_shear_angle, self.max_shear_angle)
+        
+        # affine 변환을 위해 real/imag 채널로 분리
+        img_real_view = torch.view_as_real(image_tensor).permute(0, 3, 1, 2).reshape(-1, image_tensor.shape[-2], image_tensor.shape[-1])
+        
+        # affine 변환 적용 (shear 인자 사용)
+        sheared_real_view = TF.affine(img_real_view, angle=0, translate=[0, 0], scale=1.0, shear=[shear_angle], interpolation=BILINEAR)
+        
+        # 다시 복소수 텐서로 변환
+        C, H, W = image_tensor.shape
+        return torch.view_as_complex(sheared_real_view.reshape(C, 2, H, W).permute(0, 2, 3, 1).contiguous())
+
     def _apply_transforms(self, image_tensor, p):
         if self._random_apply('fliph', p): image_tensor = self._transform_hflip(image_tensor)
         if self._random_apply('flipv', p): image_tensor = self._transform_vflip(image_tensor)
         if self._random_apply('rotate', p): image_tensor = self._transform_rotate(image_tensor)
         if self._random_apply('scale', p): image_tensor = self._transform_scale(image_tensor)
+        if self._random_apply('shift', p): image_tensor = self._transform_shift(image_tensor)
+        if self._random_apply('shear', p): image_tensor = self._transform_shear(image_tensor)
         return image_tensor
 
     def __call__(self, mask, kspace_np, target_np, attrs, fname, slice_idx):

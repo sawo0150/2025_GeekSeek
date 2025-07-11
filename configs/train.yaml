@@ -7,8 +7,8 @@ defaults:
   - training: base
   - optimizer: adamw          # ⬅️ 새로 추가  
   # - aug: mraugment    # ⬅️ 새로 추가
-  - collator: dynamicCompress          # 또는 dynamicCompress or identity or identity_debug
-  - compressor: scc  # ⬅️ 새로 추가       # gcc, scc, none
+  - collator: identity        # 또는 dynamicCompress or identity or identity_debug
+  - compressor: none  # ⬅️ 새로 추가       # gcc, scc, none 위의 collator와 짝을 맞춰야 함...
   - sampler: grouping          # 또는 grouping or identity
 
 # === Data Preprocessing === -  Mask → Crop → Compress → Tensor
@@ -17,7 +17,7 @@ crop_size: [384, 384]           # crop 할 (H, W) - 무조건 짝수로 지정
 
 # === 공통 학습 하이퍼파라미터 ===
 GPU_NUM: 0
-batch_size: 11
+batch_size: 60
 num_epochs: 20
 lr: 1e-3
 report_interval: 500
