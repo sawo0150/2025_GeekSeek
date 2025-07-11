@@ -1,0 +1,25 @@
+# sweeps/maskDuplicate_sweep.yaml
+# wandb sweep sweeps/maskDuplicate_sweep.yaml
+method: grid
+project: maskDuplicate        # ✅ 원하는 프로젝트 이름
+name: maskDuplicate_sweep_2025
+
+program: sweeps/train_entry.py        # ← entry 스크립트 경로
+command:
+  - ${env}
+  - python
+  - ${program}  
+  - "--config-name=train"
+  - ${args}                # ← wandb가 파라미터를 자동으로 확장
+  
+# 검색 공간(두 개 파라미터 선언)
+parameters:
+  maskDuplicate:
+    values: [acc4_acc8, none]
+#   epoch:
+#     values: [40, 20]
+
+# # ‘짝을 맞춘’ 2개의 조합만 실행하고 싶으면 ↓ 추가
+# parameter_points_to_evaluate:
+#   - {maskDuplicate: acc4_acc8, epoch: 20}
+#   - {maskDuplicate: none,     epoch: 40}

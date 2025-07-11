@@ -1,0 +1,163 @@
+[
+  {
+    "key": "brain_x4_396",
+    "body": "brain",
+    "acc": 4,
+    "N": 396,
+    "origin": "/home/swpants05/Desktop/2025_FastMri/Data/train/kspace/brain_acc4_1.h5"
+  },
+  {
+    "key": "brain_x4_392",
+    "body": "brain",
+    "acc": 4,
+    "N": 392,
+    "origin": "/home/swpants05/Desktop/2025_FastMri/Data/train/kspace/brain_acc4_18.h5"
+  },
+  {
+    "key": "brain_x8_396",
+    "body": "brain",
+    "acc": 8,
+    "N": 396,
+    "origin": "/home/swpants05/Desktop/2025_FastMri/Data/train/kspace/brain_acc8_1.h5"
+  },
+  {
+    "key": "brain_x8_392",
+    "body": "brain",
+    "acc": 8,
+    "N": 392,
+    "origin": "/home/swpants05/Desktop/2025_FastMri/Data/train/kspace/brain_acc8_11.h5"
+  },
+  {
+    "key": "knee_x4_372",
+    "body": "knee",
+    "acc": 4,
+    "N": 372,
+    "origin": "/home/swpants05/Desktop/2025_FastMri/Data/train/kspace/knee_acc4_1.h5"
+  },
+  {
+    "key": "knee_x4_368",
+    "body": "knee",
+    "acc": 4,
+    "N": 368,
+    "origin": "/home/swpants05/Desktop/2025_FastMri/Data/train/kspace/knee_acc4_10.h5"
+  },
+  {
+    "key": "knee_x4_322",
+    "body": "knee",
+    "acc": 4,
+    "N": 322,
+    "origin": "/home/swpants05/Desktop/2025_FastMri/Data/train/kspace/knee_acc4_14.h5"
+  },
+  {
+    "key": "knee_x4_388",
+    "body": "knee",
+    "acc": 4,
+    "N": 388,
+    "origin": "/home/swpants05/Desktop/2025_FastMri/Data/train/kspace/knee_acc4_44.h5"
+  },
+  {
+    "key": "knee_x4_480",
+    "body": "knee",
+    "acc": 4,
+    "N": 480,
+    "origin": "/home/swpants05/Desktop/2025_FastMri/Data/train/kspace/knee_acc4_56.h5"
+  },
+  {
+    "key": "knee_x4_356",
+    "body": "knee",
+    "acc": 4,
+    "N": 356,
+    "origin": "/home/swpants05/Desktop/2025_FastMri/Data/train/kspace/knee_acc4_6.h5"
+  },
+  {
+    "key": "knee_x4_320",
+    "body": "knee",
+    "acc": 4,
+    "N": 320,
+    "origin": "/home/swpants05/Desktop/2025_FastMri/Data/train/kspace/knee_acc4_61.h5"
+  },
+  {
+    "key": "knee_x8_368",
+    "body": "knee",
+    "acc": 8,
+    "N": 368,
+    "origin": "/home/swpants05/Desktop/2025_FastMri/Data/train/kspace/knee_acc8_1.h5"
+  },
+  {
+    "key": "knee_x8_372",
+    "body": "knee",
+    "acc": 8,
+    "N": 372,
+    "origin": "/home/swpants05/Desktop/2025_FastMri/Data/train/kspace/knee_acc8_10.h5"
+  },
+  {
+    "key": "knee_x8_388",
+    "body": "knee",
+    "acc": 8,
+    "N": 388,
+    "origin": "/home/swpants05/Desktop/2025_FastMri/Data/train/kspace/knee_acc8_26.h5"
+  },
+  {
+    "key": "knee_x8_386",
+    "body": "knee",
+    "acc": 8,
+    "N": 386,
+    "origin": "/home/swpants05/Desktop/2025_FastMri/Data/train/kspace/knee_acc8_39.h5"
+  },
+  {
+    "key": "knee_x8_338",
+    "body": "knee",
+    "acc": 8,
+    "N": 338,
+    "origin": "/home/swpants05/Desktop/2025_FastMri/Data/train/kspace/knee_acc8_77.h5"
+  },
+  {
+    "key": "knee_x8_322",
+    "body": "knee",
+    "acc": 8,
+    "N": 322,
+    "origin": "/home/swpants05/Desktop/2025_FastMri/Data/train/kspace/knee_acc8_84.h5"
+  },
+  {
+    "key": "knee_x8_320",
+    "body": "knee",
+    "acc": 8,
+    "N": 320,
+    "origin": "/home/swpants05/Desktop/2025_FastMri/Data/val/kspace/knee_acc8_94.h5"
+  },
+  {
+    "key": "knee_x4_370",
+    "body": "knee",
+    "acc": 4,
+    "N": 370,
+    "origin": "/home/swpants05/Desktop/2025_FastMri/Data/leaderboard/acc4/kspace/knee_test26.h5"
+  },
+  {
+    "key": "knee_x4_338",
+    "body": "knee",
+    "acc": 4,
+    "N": 338,
+    "origin": "generated"
+  },
+  {
+    "key": "knee_x4_386",
+    "body": "knee",
+    "acc": 4,
+    "N": 386,
+    "origin": "generated"
+  },
+  {
+    "key": "knee_x8_356",
+    "body": "knee",
+    "acc": 8,
+    "N": 356,
+    "origin": "generated"
+  },
+  {
+    "key": "knee_x8_480",
+    "body": "knee",
+    "acc": 8,
+    "N": 480,
+    "origin": "generated"
+  }
+]

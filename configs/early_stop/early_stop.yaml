@@ -1,0 +1,6 @@
+enable: true
+stages:
+  - {epoch: 1, ssim: 0.93}
+  - {epoch: 10, ssim: 0.957}
+  - {epoch: 20, ssim: 0.961}
+  - {epoch: 25, ssim: 0.963}
