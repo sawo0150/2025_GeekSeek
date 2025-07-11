@@ -114,13 +114,14 @@ def create_data_loaders(data_path, args, shuffle=False, isforward=False, augment
 
     transforms = []
 
-    # (0) MRaugment
+    # ✨ (0) Spatial crop을 가장 먼저 수행하도록 순서 변경
+    if getattr(args, 'use_crop', False):
+        transforms.append(CenterCropOrPad(target_size=tuple(args.crop_size)))
+
+    # ✨ (1) MRaugment를 crop 이후에 적용
     if augmenter is not None and not isforward:
         transforms.append(augmenter)
 
-    # (1) Mask 적용 및 k-space numpy 반환
-    from utils.data.transforms import MaskApplyTransform
-    transforms.append(MaskApplyTransform())
 
     # (2) Spatial crop (토글)
     if getattr(args, 'use_crop', False):

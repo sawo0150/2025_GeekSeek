@@ -189,13 +189,32 @@ class MRAugmenter:
         C, H, W = image_tensor.shape
         return torch.view_as_complex(sheared_real_view.reshape(C, 2, H, W).permute(0, 2, 3, 1).contiguous())
 
+
     def _apply_transforms(self, image_tensor, p):
-        if self._random_apply('fliph', p): image_tensor = self._transform_hflip(image_tensor)
-        if self._random_apply('flipv', p): image_tensor = self._transform_vflip(image_tensor)
-        if self._random_apply('rotate', p): image_tensor = self._transform_rotate(image_tensor)
-        if self._random_apply('scale', p): image_tensor = self._transform_scale(image_tensor)
-        if self._random_apply('shift', p): image_tensor = self._transform_shift(image_tensor)
-        if self._random_apply('shear', p): image_tensor = self._transform_shear(image_tensor)
+        # [수정] 어떤 증강이 적용되었는지 로그를 남김
+        applied_transforms = []
+        if self._random_apply('fliph', p):
+            image_tensor = self._transform_hflip(image_tensor)
+            applied_transforms.append('hflip')
+        if self._random_apply('flipv', p):
+            image_tensor = self._transform_vflip(image_tensor)
+            applied_transforms.append('flipv')
+        if self._random_apply('rotate', p):
+            image_tensor = self._transform_rotate(image_tensor)
+            applied_transforms.append('rotate')
+        if self._random_apply('scale', p):
+            image_tensor = self._transform_scale(image_tensor)
+            applied_transforms.append('scale')
+        if self._random_apply('shift', p):
+            image_tensor = self._transform_shift(image_tensor)
+            applied_transforms.append('shift')
+        if self._random_apply('shear', p):
+            image_tensor = self._transform_shear(image_tensor)
+            applied_transforms.append('shear')
+            
+        if applied_transforms:
+            print(f"[Augmenter] Applied: {', '.join(applied_transforms)}")
+            
         return image_tensor
 
     def __call__(self, mask, kspace_np, target_np, attrs, fname, slice_idx):

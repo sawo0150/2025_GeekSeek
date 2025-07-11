@@ -6,7 +6,7 @@ defaults:
   - LossFunction: MS_SSIM+L1
   - training: base
   - optimizer: adamw          # ⬅️ 새로 추가  
-  # - aug: mraugment    # ⬅️ 새로 추가
+  - aug: mraugment    # ⬅️ 새로 추가
   - collator: identity        # 또는 dynamicCompress or identity or identity_debug
   - compressor: none  # ⬅️ 새로 추가       # gcc, scc, none 위의 collator와 짝을 맞춰야 함...
   - sampler: grouping          # 또는 grouping or identity
