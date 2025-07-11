@@ -1,17 +1,18 @@
-enable: true
+# ---------------- MaskAugmenter: universal ----------------
+enable: true  # create_data_loaders 에서 활성화 스위치
 _target_: utils.augmentations.maskaugmenter.MaskAugmenter
 
 # ---- 공통 스케줄러 (MRaugmenter와 동일) ------------------
-aug_on: true
-aug_strength: 0.9
-aug_delay: 5
-aug_schedule_mode: epoch
-aug_schedule_type: ramp
-max_epochs: ${num_epochs}
-val_loss_window_size: 5
-val_loss_grad_start: -0.05
-val_loss_grad_plateau: -0.001
-aug_exp_decay: 6.0
+aug_on: true  # 전체 기능 On/Off
+aug_strength: 0.6 # p_max: 최대 적용 확률
+aug_delay: 5      # delay epoch 수 (0~4 epoch 은 p=0)
+aug_schedule_mode: epoch  # 'epoch' | 'val_loss' | 'constant'
+aug_schedule_type: ramp   # 'epoch' | 'val_loss' | 'constant'
+max_epochs: ${num_epochs} # 스케줄이 T 에 도달하면 p=p_max
+val_loss_window_size: 5   # (val_loss 모드) 기울기 계산용 윈도우
+val_loss_grad_start: -0.05  #   ─┐ 기울기가 이보다 크면 k=0
+val_loss_grad_plateau: -0.001 #   └─ 기울기가 이보다 작으면 k=1
+aug_exp_decay: 6.0            # 'exp' 타입일 때 지수 감쇠 상수
 
 # ---- MaskFunc 풀 ----------------------------------------
 # * key   : mask type  (subsample.py 의 create_mask_for_mask_type 인자)
@@ -20,20 +21,20 @@ aug_exp_decay: 6.0
 # * cf    : float or [list] or [min,max]  (min,max → 연속 랜덤)
 #           ─ cf = center_fraction
 mask_specs:
-  random:
+  equispaced:   # ▸ EquiSpacedMaskFunc
     prob: 0.4
-    accel: [4, 8]          # choices
-    cf:    [0.04, 0.12]    # 연속 범위
-  equispaced:
+    accel: [4, 8]
+    cf:    [0.07, 0.10] #실제 학습 데이터 값을 통해 근사...
+  equispaced_fraction:    # ▸ EquispacedMaskFractionFunc
     prob: 0.3
     accel: [4, 8]
-    cf:    [0.03, 0.08]
-  equispaced_fraction:
-    prob: 0.15
-    accel: [4, 8]
-    cf:    [0.03, 0.08]
-  magic_fraction:
-    prob: 0.15
+    cf:    [0.07, 0.10]
+  random:   # ▸ RandomMaskFunc -- 무작위 샘플링
+    prob: 0.2   #   이 타입이 뽑힐 가중치 (전체 합으로 정규화)
+    accel: [4, 8]          # #   undersampling 배수 중 랜덤 선택
+    cf:    [0.07, 0.10]    # #   center-fraction 실수 균등 샘플
+  magic_fraction:   # ▸ MagicMaskFractionFunc
+    prob: 0.10
     accel: 8               # 단일 값
     cf:    0.04            # 단일 값
-allow_any_combination: true   # cf·accel 짝짓기 자유
+allow_any_combination: true   # accel 과 cf 를 교차 짝짓기 허용 여부

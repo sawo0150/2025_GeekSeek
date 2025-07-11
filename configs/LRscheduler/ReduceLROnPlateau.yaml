@@ -1,0 +1,5 @@
+_target_: torch.optim.lr_scheduler.ReduceLROnPlateau
+mode: min                # val_loss 기준
+factor: 0.5              # 2 × 감소
+patience: 5              # 연속 5번 개선 없을 때
+threshold: 1e-4

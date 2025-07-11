@@ -1,0 +1,4 @@
+_target_: torch.optim.lr_scheduler.CosineAnnealingWarmRestarts
+T_0: "${calc:${num_epochs} // 4}"   # 첫 주기 = 전체 epoch 의 ¼
+T_mult: 2
+eta_min: 1e-6

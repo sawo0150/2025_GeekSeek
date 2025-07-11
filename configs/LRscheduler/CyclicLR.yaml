@@ -1,0 +1,8 @@
+# configs/LRscheduler/CyclicLR.yaml
+_target_: torch.optim.lr_scheduler.CyclicLR
+_partial_: true
+base_lr: ${lr}
+max_lr: "${calc:${lr} * 6}"
+step_size_up: 0  # ← 숫자는 코드에서 채움
+mode: triangular2
+cycle_momentum: false

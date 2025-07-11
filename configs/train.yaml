@@ -2,14 +2,14 @@ defaults:
   - _self_
   - model: varnet_small   # 모델 설정
   - data: local_sangwonDesktop         # 데이터 경로 설정
-  - LRscheduler: CosineAnnealingLR        # ⬅️  추가 - https://gaussian37.github.io/dl-pytorch-lr_scheduler/참고
+  - LRscheduler: StepLR        # ⬅️  추가 - https://gaussian37.github.io/dl-pytorch-lr_scheduler/참고
   - LossFunction: SSIM+L1
   - training: base
   - early_stop: none    # 조기종료 기능 : early_stop or none
   - evaluation: leaderboard
   - optimizer: adamw          # ⬅️ 새로 추가  
-  # - aug: mraugment    # ⬅️ 새로 추가
-  - maskDuplicate: acc4_acc8       # acc4_acc8 or none
+  - aug: mraugment    # ⬅️ 새로 추가
+  - maskDuplicate: none       # acc4_acc8 or none
   - maskAugment: none             # universal or basic or none 
   - collator: identity          # 또는 dynamicCompress or identity or identity_debug
   - compressor: scc  # ⬅️ 새로 추가       # gcc, scc, none

@@ -1,0 +1,3 @@
+_target_: torch.optim.lr_scheduler.MultiStepLR
+milestones: [10, 15]     # epoch 번호
+gamma: 0.5

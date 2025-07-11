@@ -23,6 +23,7 @@ class MaskAugmenter:
                  allow_any_combination: bool = True):
         # --- 스케줄 파라미터 저장 -----------------------------------------
         self.aug_on = aug_on
+        # print("ㄴㅇㄹㄴㅇㅎㄱㅎㅈㄷㄷㅈㅎㅈㄷ",aug_on)
         self.aug_strength = aug_strength
         self.mode  = aug_schedule_mode
         self.stype = aug_schedule_type
