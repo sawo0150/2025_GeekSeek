@@ -8,7 +8,7 @@ defaults:
   - optimizer: adamw          # ⬅️ 새로 추가  
   # - aug: mraugment    # ⬅️ 새로 추가
   - collator: dynamicCompress          # 또는 dynamicCompress or identity or identity_debug
-  - compressor: none  # ⬅️ 새로 추가       # gcc, scc, none
+  - compressor: scc  # ⬅️ 새로 추가       # gcc, scc, none
   - sampler: grouping          # 또는 grouping or identity
 
 # === Data Preprocessing === -  Mask → Crop → Compress → Tensor

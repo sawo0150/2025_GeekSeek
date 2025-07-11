@@ -38,23 +38,38 @@ class IdentityCompressor(BaseCompressor):
         return kspace
     
 class SCCCompressor(BaseCompressor):
-    def __init__(self, target_coils: int = 4):
+    def __init__(self, target_coils: int = 4, num_calib_lines: int = 24):
         super().__init__(target_coils)
+        self.num_calib_lines = num_calib_lines
 
     # @profile  # <-- line_profiler 이 읽는 어노테이션
     def compress(self, kspace: np.ndarray, attrs: dict) -> np.ndarray:
-        # 1) (C, H, W) → (C, H*W)
+        # ┕ [수정] kspace 전체 대신 중앙의 보정 라인(calibration lines)을 사용하여 SVD를 수행
+        # kspace shape: (C, H, W)
         C, H, W = kspace.shape
-        flat = kspace.reshape(C, -1)
-        # 2) SVD
-        u, s, vh = np.linalg.svd(flat, full_matrices=False)
-        # 3) 상위 self.target_coils 개 프로젝션
-        u_reduced = u[:, : self.target_coils]            # (C, T)
-        compressed_flat = u_reduced.T @ flat             # (T, H*W)
-        # 4) (T, H, W) 로 복원
+
+        # 1) 보정 데이터 추출 (k-space의 중앙)
+        calib_start = H // 2 - self.num_calib_lines // 2
+        calib_end = H // 2 + self.num_calib_lines // 2
+        calib_data = kspace[:, calib_start:calib_end, :] # (C, num_calib_lines, W)
+
+        # 2) 보정 데이터를 펼쳐서 SVD 수행
+        calib_flat = calib_data.reshape(C, -1) # (C, num_calib_lines * W)
+        u, s, vh = np.linalg.svd(calib_flat, full_matrices=False)
+
+        # 3) 상위 self.target_coils 개수에 해당하는 압축 행렬 생성
+        u_reduced = u[:, : self.target_coils] # (C, T)
+
+        # 4) 생성된 압축 행렬을 '전체' k-space에 적용
+        kspace_flat = kspace.reshape(C, -1)             # (C, H*W)
+        compressed_flat = u_reduced.T @ kspace_flat     # (T, H*W)
+
+        # 5) 원래 형태로 복원 (T, H, W)
         compressed = compressed_flat.reshape(self.target_coils, H, W)
-        # 5) 타입 복원 (optional)
+
+        # 6) 타입 복원 (optional)
         return compressed.astype(kspace.dtype)
+
 
 
 
