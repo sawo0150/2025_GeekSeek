@@ -1,3 +1,3 @@
 python leaderboard_eval.py \
-  -lp '/root/Data/leaderboard' \
-  -yp '../result/test_Varnet/reconstructions_leaderboard'
+  -lp '/home/swpants05/Desktop/2025_FastMri/Data/leaderboard/' \
+  -yp '../result/small_varnet_resume_test/reconstructions_leaderboard'

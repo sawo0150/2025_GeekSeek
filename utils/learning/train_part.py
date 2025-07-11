@@ -22,6 +22,7 @@ from torch.nn import Module
 
 from collections import defaultdict
 from utils.data.load_data import create_data_loaders
+from utils.learning.leaderboard_eval_part import run_leaderboard_eval
 from utils.logging.metric_accumulator import MetricAccumulator
 from utils.logging.vis_logger import log_epoch_samples
 from utils.common.utils import save_reconstructions, ssim_loss, ssim_loss_gpu
@@ -112,6 +113,7 @@ def validate(args, model, data_loader, acc_val, epoch, loss_type, ssim_metric):
     targets = defaultdict(dict)
     start = time.perf_counter()
     total_loss = 0.0
+    total_ssim = 0.0
     n_slices   = 0
     
     len_loader = len(data_loader)                 # ← 전체 길이
@@ -129,18 +131,6 @@ def validate(args, model, data_loader, acc_val, epoch, loss_type, ssim_metric):
             target  = target.cuda(non_blocking=True)
             maximum = maximum.cuda(non_blocking=True)
             output = model(kspace, mask)
-
-            # for i in range(output.shape[0]):    # validate Batch 개수 고려해서 for로 묶었는듯
-            #     reconstructions[fnames[i]][int(slices[i])] = output[i].cpu().numpy()
-            #     targets[fnames[i]][int(slices[i])] = target[i].numpy()
-                
-            #     # ---- 스칼라 누적 -----------------------------------------
-            #     loss_i  = ssim_loss(target[i].numpy(),
-            #                         output[i].cpu().numpy())
-            #     total_loss += loss_i
-            #     n_slices   += 1
-            #     acc_val.update(loss_i, 1 - loss_i, [cats[i]])
-
             
             for i in range(output.shape[0]):    # validate Batch 개수 고려해서 for로 묶었는듯
                 reconstructions[fnames[i]][int(slices[i])] = output[i].cpu().numpy()
@@ -157,6 +147,7 @@ def validate(args, model, data_loader, acc_val, epoch, loss_type, ssim_metric):
                 # -------------- SSIM metric 계산 ---------------
                 ssim_loss_i = ssim_metric(out_slice, tgt_slice, max_i, cats[i]).item()
                 ssim_i = 1 - ssim_loss_i
+                total_ssim += ssim_i
                 acc_val.update(loss_i, ssim_i, [cats[i]])
 
     for fname in reconstructions:
@@ -172,9 +163,10 @@ def validate(args, model, data_loader, acc_val, epoch, loss_type, ssim_metric):
     # num_subjects = len(reconstructions)
     
     metric_loss = total_loss / n_slices        # ← leaderboard 방식 (Slice 별 평균)
+    metric_ssim = total_ssim / n_slices        # ← leaderboard 방식 (Slice 별 평균)
     
 
-    return metric_loss, n_slices, reconstructions, targets, None, time.perf_counter() - start
+    return metric_loss, metric_ssim, n_slices, reconstructions, targets, None, time.perf_counter() - start
 
 def save_model(args, exp_dir, epoch, model, optimizer, best_val_loss, is_new_best):
     
@@ -196,10 +188,25 @@ def train(args):
     
     print('Current cuda device: ', torch.cuda.current_device())
 
+    # 파일 맨 앞, train() 안
+    dup_cfg   = getattr(args, "maskDuplicate", {"enable": False})
+    dup_mul   = (len(dup_cfg.get("accel_cfgs", []))
+                if dup_cfg.get("enable", False) else 1)
+    
+    print(f"[Hydra-maskDuplicate] {dup_cfg}")
+
     # ▸ 0. 옵션 파싱 (기본값 유지)
     accum_steps   = getattr(args, "training_accum_steps",   1)
     checkpointing = getattr(args, "training_checkpointing", False)
     amp_enabled   = getattr(args, "training_amp",           False)
+
+    early_cfg = getattr(args, "early_stop", {})
+    early_enabled = early_cfg.get("enable", False)
+    stage_table = {s["epoch"]: s["ssim"] for s in early_cfg.get("stages", [])}
+    # ex) {10:0.90, 20:0.95, 25:0.96}
+    print(f"[Hydra-eval] {early_cfg}")
+    print(f"[Hydra-eval] early_enabled={early_enabled}, stage_table={stage_table}")
+
 
     model = VarNet(num_cascades=args.cascade,
                    chans=args.chans,
@@ -238,6 +245,7 @@ def train(args):
     # ── Resume logic (이제 model, optimizer가 정의된 이후) ──
     start_epoch   = 0
     best_val_loss = float('inf')
+    best_val_ssim = 0.0
     val_loss_history = [] # val loss기록 for augmenter
 
     if getattr(args, 'resume_checkpoint', None):
@@ -245,6 +253,7 @@ def train(args):
         model.load_state_dict(ckpt['model'])
         optimizer.load_state_dict(ckpt['optimizer'])
         best_val_loss = ckpt.get('best_val_loss', float('inf'))
+        best_val_ssim = ckpt.get('best_val_ssim', 0.0)
         start_epoch = ckpt.get('epoch', 0)
         val_loss_history = ckpt.get('val_loss_history', []) # 체크포인트에서 기록 복원
         print(f"[Resume] Loaded '{args.resume_checkpoint}' → epoch {start_epoch}, best_val_loss={best_val_loss:.4f}")
@@ -269,11 +278,21 @@ def train(args):
     else:
         scheduler = None
 
-    best_val_loss = 10000.
-
     print(args.data_path_train)
     print(args.data_path_val)
 
+    # ───────────────── evaluation 서브트리 언랩 ─────────────────
+    # ①  args.evaluation 이 이미 {"enable": …} 형태라면 그대로 사용
+    # ②  args.evaluation 이 {"evaluation": {...}} 처럼 한 번 더
+    #     래핑돼 있으면 내부 dict 를 꺼낸다.
+    _raw_eval = getattr(args, "evaluation", {})
+    eval_cfg  = _raw_eval.get("evaluation", _raw_eval)
+
+    lb_enable = eval_cfg.get("enable", False)
+    lb_every  = eval_cfg.get("every_n_epochs", 999_999)   # 기본 매우 크게
+
+    print(f"[Hydra-eval] {eval_cfg}")
+    print(f"[Hydra-eval] lb_enable={lb_enable}, lb_every={lb_every}")
 
     # train_loader = create_data_loaders(data_path = args.data_path_train, args = args, shuffle=True) # 매 에폭마다 생성 예정
     val_loader = create_data_loaders(data_path=args.data_path_val, args=args, augmenter=None)
@@ -300,7 +319,7 @@ def train(args):
                                              train_loader, optimizer,
                                              loss_type, ssim_metric, MetricLog_train,
                                              scaler, amp_enabled, accum_steps)
-        val_loss, num_subjects, reconstructions, targets, inputs, val_time = validate(args, model, val_loader,
+        val_loss,val_ssim, num_subjects, reconstructions, targets, inputs, val_time = validate(args, model, val_loader,
                                                                                         MetricLog_val, epoch,
                                                                                         loss_type, ssim_metric)
         # ✨ val_loss 기록 (스케줄러 및 체크포인트용)
@@ -315,8 +334,10 @@ def train(args):
         val_loss = torch.tensor(val_loss).cuda(non_blocking=True)
         num_subjects = torch.tensor(num_subjects).cuda(non_blocking=True)
 
-        is_new_best = val_loss < best_val_loss
+        # is_new_best = val_loss < best_val_loss
+        is_new_best = val_ssim > best_val_ssim
         best_val_loss = min(best_val_loss, val_loss)
+        best_val_ssim = max(best_val_ssim, val_ssim)
 
         # ✨ save_model에 val_loss_history 추가 (상태 저장을 위해)
         checkpoint = {
@@ -324,6 +345,7 @@ def train(args):
             'args': args,
             'model': model.state_dict(),
             'optimizer': optimizer.state_dict(),
+            'best_val_ssim': best_val_ssim,
             'best_val_loss': best_val_loss,
             'exp_dir': str(args.exp_dir),
             'val_loss_history': val_loss_history 
@@ -343,22 +365,46 @@ def train(args):
 
         # ---------------- W&B 에폭 로그 (카테고리별) ----------------
         if getattr(args, "use_wandb", False) and wandb:
-            MetricLog_train.log(epoch)
-            MetricLog_val.log(epoch)
+            MetricLog_train.log(epoch*dup_mul)
+            MetricLog_val.log(epoch*dup_mul)
             # 추가 전역 정보(learning-rate 등)만 개별로 저장
             log_epoch_samples(reconstructions, targets,
-                            step=epoch,
+                            step=epoch*dup_mul,
                             max_per_cat=args.max_vis_per_cat)   # ← config 값 사용
             
             wandb.log({"epoch": epoch,
-                       "lr": optimizer.param_groups[0]['lr']}, step=epoch)
+                       "lr": optimizer.param_groups[0]['lr']}, step=epoch*dup_mul)
             if is_new_best:
                 wandb.save(str(args.exp_dir / "best_model.pt"))
 
+        # ───────── Leaderboard 평가 트리거 ─────────
+        if lb_enable and (epoch + 1) % lb_every == 0:
+            print(f"[LeaderBoard] Epoch {epoch+1}: reconstruct & eval 시작")
+            t0 = time.perf_counter()
+            ssim = run_leaderboard_eval(
+                model_ckpt_dir=args.exp_dir,
+                leaderboard_root=Path(eval_cfg["leaderboard_root"]),
+                gpu=args.GPU_NUM,
+                batch_size=eval_cfg["batch_size"],
+                output_key=eval_cfg["output_key"],
+            )
+            dt = time.perf_counter() - t0
+            print(f"[LeaderBoard] acc4={ssim['acc4']:.4f}  acc8={ssim['acc8']:.4f}  "
+                  f"mean={ssim['mean']:.4f}  ({dt/60:.1f} min)")
+
+            # ─ W&B 로깅 ─
+            if getattr(args, "use_wandb", False) and wandb:
+                wandb.log({
+                    "leaderboard/ssim_acc4": ssim["acc4"],
+                    "leaderboard/ssim_acc8": ssim["acc8"],
+                    "leaderboard/ssim_mean": ssim["mean"],
+                    "leaderboard/epoch":     epoch,
+                    "leaderboard/time_min":  dt/60,
+                }, step=epoch*dup_mul)
                                 
         print(
             f'Epoch = [{epoch:4d}/{args.num_epochs:4d}] TrainLoss = {train_loss:.4g} '
-            f'ValLoss = {val_loss:.4g} TrainTime = {train_time:.4f}s ValTime = {val_time:.4f}s',
+            f'ValLoss = {val_loss:.4g} ValSSIM = {val_ssim:.4g} TrainTime = {train_time:.4f}s ValTime = {val_time:.4f}s',
         )
 
         if is_new_best:
@@ -368,3 +414,12 @@ def train(args):
             print(
                 f'ForwardTime = {time.perf_counter() - start:.4f}s',
             )
+
+        # ────────── epoch 루프 내부, val 계산·로그 이후 ──────────
+        current_epoch = epoch + 1         # 사람 눈금 1-base
+        if early_enabled and current_epoch in stage_table:
+            req = stage_table[current_epoch]
+            if val_ssim < req:
+                print(f"[EarlyStop] Epoch {current_epoch}: "
+                    f"val_ssim={val_ssim:.4f} < target={req:.4f}. 학습 중단!")
+                break                     # for epoch 루프 탈출

@@ -1,0 +1,2 @@
+enable: false
+# _target_ 없음 → instantiate 호출 안 됨

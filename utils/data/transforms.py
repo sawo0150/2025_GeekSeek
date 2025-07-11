@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from typing import Tuple
+from collections.abc import Mapping     #  ← 추가
 import fastmri
  
 
@@ -106,6 +107,11 @@ class CenterCropOrPad:
         return std_real, std_imag
 
     def __call__(self, mask, kspace, target, attrs, fname, slice_idx):
+        # ── 0. attrs 가 dict/Mapping 아니면 빈 dict 로 대체 ─────────
+        if not isinstance(attrs, Mapping):
+            attrs = {}
+        # kspace: torch.Tensor (C,H,W) complex represented as complex dtypece.real,kspace.imag),-1)
+        # ❶ 입력을 complex64 dtype 으로 맞춤
         k_cplx = to_tensor(kspace).to(torch.complex64)
         k_ri = torch.view_as_real(k_cplx)
         img = torch_ifft2c(k_ri)
