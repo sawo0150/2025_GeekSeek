@@ -1,0 +1,26 @@
+# sweeps/maskDuplicate_sweep.yaml
+# wandb sweep sweeps/maskDuplicate_sweep.yaml
+method: grid
+project: maskDuplicate        # ✅ 원하는 프로젝트 이름
+name: maskDuplicate_sweep_2025
+
+program: sweeps/train_entry.py        # ← entry 스크립트 경로
+command:
+  - ${env}
+  - python
+  - ${program}  
+  - "--config-name=train"
+  - ${args}                           # wandb 가 자동으로 --maskDuplicate … 생성
+
+parameters:
+  maskDuplicate:
+    values: [acc4_acc8, none]
+
+  epoch:            # <- 새로 추가
+    values: [30, 60]
+
+
+# maskDuplicate‑epoch 조합을 1:1 로 “필터”하는 제약
+parameter_constraints:
+  - (maskDuplicate == 'acc4_acc8' and epoch == 30) \
+    or (maskDuplicate == 'none' and epoch == 60)

@@ -4,6 +4,8 @@ import argparse, subprocess, sys, os
 
 def parse_args():
     parser = argparse.ArgumentParser()
+    # ===== sweep 에서 넘길 파라미터들 =====
+    parser.add_argument("--maskDuplicate",  type=str)
     # 기존 optimizer
     parser.add_argument("--optimizer",    type=str, required=False)
     # 추가로 sweep 할 파라미터들
@@ -22,6 +24,11 @@ cmd = ["python", "main.py"]
 # 1) --config-name 은 Hydra 쪽으로
 if args.config_name:
     cmd.append(f"--config-name={args.config_name}")
+
+# 2) maskDuplicate 단일 파라미터 sweep
+if args.maskDuplicate:
+    cmd.append(f"maskDuplicate={args.maskDuplicate}")
+
 
 # 2) optimizer override
 if args.optimizer:

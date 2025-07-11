@@ -131,18 +131,6 @@ def validate(args, model, data_loader, acc_val, epoch, loss_type, ssim_metric):
             target  = target.cuda(non_blocking=True)
             maximum = maximum.cuda(non_blocking=True)
             output = model(kspace, mask)
-
-            # for i in range(output.shape[0]):    # validate Batch 개수 고려해서 for로 묶었는듯
-            #     reconstructions[fnames[i]][int(slices[i])] = output[i].cpu().numpy()
-            #     targets[fnames[i]][int(slices[i])] = target[i].numpy()
-                
-            #     # ---- 스칼라 누적 -----------------------------------------
-            #     loss_i  = ssim_loss(target[i].numpy(),
-            #                         output[i].cpu().numpy())
-            #     total_loss += loss_i
-            #     n_slices   += 1
-            #     acc_val.update(loss_i, 1 - loss_i, [cats[i]])
-
             
             for i in range(output.shape[0]):    # validate Batch 개수 고려해서 for로 묶었는듯
                 reconstructions[fnames[i]][int(slices[i])] = output[i].cpu().numpy()
@@ -199,6 +187,13 @@ def train(args):
     torch.cuda.set_device(device)
     
     print('Current cuda device: ', torch.cuda.current_device())
+
+    # 파일 맨 앞, train() 안
+    dup_cfg   = getattr(args, "maskDuplicate", {"enable": False})
+    dup_mul   = (len(dup_cfg.get("accel_cfgs", []))
+                if dup_cfg.get("enable", False) else 1)
+    
+    print(f"[Hydra-maskDuplicate] {dup_cfg}")
 
     # ▸ 0. 옵션 파싱 (기본값 유지)
     accum_steps   = getattr(args, "training_accum_steps",   1)
@@ -370,15 +365,15 @@ def train(args):
 
         # ---------------- W&B 에폭 로그 (카테고리별) ----------------
         if getattr(args, "use_wandb", False) and wandb:
-            MetricLog_train.log(epoch)
-            MetricLog_val.log(epoch)
+            MetricLog_train.log(epoch*dup_mul)
+            MetricLog_val.log(epoch*dup_mul)
             # 추가 전역 정보(learning-rate 등)만 개별로 저장
             log_epoch_samples(reconstructions, targets,
-                            step=epoch,
+                            step=epoch*dup_mul,
                             max_per_cat=args.max_vis_per_cat)   # ← config 값 사용
             
             wandb.log({"epoch": epoch,
-                       "lr": optimizer.param_groups[0]['lr']}, step=epoch)
+                       "lr": optimizer.param_groups[0]['lr']}, step=epoch*dup_mul)
             if is_new_best:
                 wandb.save(str(args.exp_dir / "best_model.pt"))
 
@@ -405,7 +400,7 @@ def train(args):
                     "leaderboard/ssim_mean": ssim["mean"],
                     "leaderboard/epoch":     epoch,
                     "leaderboard/time_min":  dt/60,
-                }, step=epoch)
+                }, step=epoch*dup_mul)
                                 
         print(
             f'Epoch = [{epoch:4d}/{args.num_epochs:4d}] TrainLoss = {train_loss:.4g} '

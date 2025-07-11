@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 from torch.utils.data import default_collate
 from torch.utils.data.sampler import BatchSampler
+from utils.data.transform_wrapper import TransformWrapper
 # ─ leaderboard forward 전용 기본 샘플러
 from utils.data.sampler import GroupByCoilBatchSampler
 
@@ -169,31 +170,30 @@ def create_data_loaders(data_path, args, shuffle=False, isforward=False, augment
     # (4) Tensor 변환 및 real/imag 스택
     transforms.append(DataTransform(isforward, max_key_))
 
-    transform = MultiCompose(transforms)
+    transform_chain = MultiCompose(transforms)
 
-    data_storage = SliceData(
+    # 1)  *** Raw SliceData (transform=None) ***
+    raw_ds = SliceData(
         root=data_path,
-        transform=transform,
+        transform=lambda *x: x,   # identity
         input_key=args.input_key,
         target_key=target_key_,
         forward = isforward
     )
 
-    dup_cfg = getattr(args, "maskDuplicate", {"enable": False})
-    # print(dup_cfg)
-    if dup_cfg.get("enable", False) and not isforward:
-        # data_storage = instantiate(dup_cfg, base_ds=data_storage, _recursive_=False)
+    # 2)  *** Duplicate 적용 (crop 前) ***
+    dup_cfg = getattr(args,"maskDuplicate",{"enable":False})
+    if dup_cfg.get("enable",False) and not isforward:
+        dup_cfg_clean = OmegaConf.create({k:v for k,v in dup_cfg.items()
+                                          if k!="enable"})
+        duped_ds = instantiate(dup_cfg_clean, base_ds=raw_ds,
+                               _recursive_=False)
+    else:
+        duped_ds = raw_ds
 
-        # ➊ enable 키만 제거한 임시 사본 생성
-        dup_cfg_clean = OmegaConf.create(
-            {k: v for k, v in dup_cfg.items() if k != "enable"}
-        )
-        # ➋ 깨끗한 사본으로 instantiation
-        data_storage = instantiate(dup_cfg_clean,
-                                base_ds=data_storage,
-                                _recursive_=False)
-
-
+    # 3)  *** TransformWrapper 로 실제 변환 ***
+    data_storage = TransformWrapper(duped_ds, transform_chain)
+    
     # 1) collate_fn
     if isforward:                       # forward 모드 : 안전 collator
         collate_fn = default_collate

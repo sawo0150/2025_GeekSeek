@@ -1,14 +1,10 @@
 enable: true
 _target_: utils.data.duplicate_dataset.DuplicateMaskDataset
 
-# 두 acceleration 및 매개변수 범위
+# 복제할 가속도 목록
 accel_cfgs:
-  - {accel: 4, cf: [0.07, 0.12], mask_type: random}
-  - {accel: 8, cf: [0.03, 0.06], mask_type: random}
+  - {accel: 4}
+  - {accel: 8}
 
-
-# accel_cfgs: List[Dict]
-#     └─ {accel: 4, cf: [0.07,0.12], mask_type: random}
-#         {accel: 8, cf: 0.04,       mask_type: equispaced}  
-
-allow_any_combination: true
+# 📍 절대경로  ──  train.yaml 의 repo_ROOT 를 그대로 참조
+bundle_path: ${data.repo_ROOT}/metaData/precomputed_masks.npz
