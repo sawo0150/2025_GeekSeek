@@ -8,7 +8,7 @@ defaults:
   - early_stop: none    # 조기종료 기능 : early_stop or none
   - evaluation: leaderboard
   - optimizer: adamw          # ⬅️ 새로 추가  
-  # - aug: mraugment    # ⬅️ 새로 추가
+  - aug: mraugment    # ⬅️ 새로 추가
   - maskDuplicate: acc4_acc8       # acc4_acc8 or none
   - maskAugment: none             # universal or basic or none 
   - collator: identity          # 또는 dynamicCompress or identity or identity_debug

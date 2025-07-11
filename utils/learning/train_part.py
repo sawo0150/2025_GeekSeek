@@ -28,6 +28,8 @@ from utils.logging.vis_logger import log_epoch_samples
 from utils.common.utils import save_reconstructions, ssim_loss, ssim_loss_gpu
 from utils.common.loss_function import SSIMLoss # train loss & metric loss
 from utils.model.varnet import VarNet
+from utils.logging.receptive_field import log_receptive_field
+
 
 import os
 
@@ -365,6 +367,7 @@ def train(args):
 
         # ---------------- W&B 에폭 로그 (카테고리별) ----------------
         if getattr(args, "use_wandb", False) and wandb:
+
             MetricLog_train.log(epoch*dup_mul)
             MetricLog_val.log(epoch*dup_mul)
             # 추가 전역 정보(learning-rate 등)만 개별로 저장
@@ -374,6 +377,17 @@ def train(args):
             
             wandb.log({"epoch": epoch,
                        "lr": optimizer.param_groups[0]['lr']}, step=epoch*dup_mul)
+            
+            
+            # ┕ [추가] 매 에폭의 검증 단계 후, ERF를 계산하고 W&B에 로깅합니다.
+            print("Calculating and logging effective receptive field...")
+            log_receptive_field(
+                model=model,
+                data_loader=val_loader,
+                epoch=epoch,
+                device=device
+            )
+            print("Effective receptive field logged to W&B.")
             if is_new_best:
                 wandb.save(str(args.exp_dir / "best_model.pt"))
 
