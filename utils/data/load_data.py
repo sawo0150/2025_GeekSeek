@@ -135,7 +135,7 @@ class SliceData(Dataset):
         return (*sample, cat) if not self.forward else sample
 
 
-def create_data_loaders(data_path, args, shuffle=False, isforward=False, augmenter=None):
+def create_data_loaders(data_path, args, shuffle=False, isforward=False, augmenter=None, mask_augmenter=None):
     if isforward == False:
         max_key_ = args.max_key
         target_key_ = args.target_key
@@ -149,10 +149,8 @@ def create_data_loaders(data_path, args, shuffle=False, isforward=False, augment
     if augmenter is not None and not isforward:
         transforms.append(augmenter)
 
-    aug_cfg = getattr(args, "maskAugment", {"enable": False})
-    if aug_cfg.get("enable", False) and not isforward:
-        transforms.append(instantiate(aug_cfg))
-
+    if mask_augmenter is not None and not isforward:
+        transforms.append(mask_augmenter)
 
     # (1) Mask 적용 및 k-space numpy 반환
     from utils.data.transforms import MaskApplyTransform

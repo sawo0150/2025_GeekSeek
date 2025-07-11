@@ -1,0 +1,36 @@
+# wandb sweep sweeps/LR_sweep.yaml
+method: grid
+name: lr_scheduler_grid_2025_a100
+project: LR_sweep        # ✅ 원하는 프로젝트 이름
+
+parameters:
+  # ➊ 어떤 스케줄러를 쓸 것인가
+  scheduler:
+    values:
+      - CosineAnnealingLR
+      - CosineAnnealingWarmRestarts
+      - CyclicLR
+      - ExponentialLR
+      - MultiStepLR
+      - OneCycleLR
+      - ReduceLROnPlateau
+      - StepLR
+
+  # # ➋(선택) 공통/대표 하이퍼파라미터 샘플
+  # step_size:          # StepLR, CyclicLR 용
+  #   values: [5, 10]
+  # gamma:              # StepLR, MultiStepLR, ExponentialLR 용
+  #   values: [0.5, 0.8]
+  # T0_frac:            # CosineAnnealingWarmRestarts : T_0 = frac × num_epochs
+  #   values: [0.25, 0.5]
+  # pct_start:          # OneCycleLR warm-up 비율
+  #   values: [0.3]
+
+program: sweeps/train_entry.py
+command:
+  - ${env}
+  - python
+  - ${program}
+  # - "--config-name=sweeping_default"   # 기본 Hydra config
+  - "--config-name=train"
+  - ${args}                            # ↑ parameters 가 여기로 풀림

@@ -13,6 +13,8 @@ def parse_args():
     parser.add_argument("--loss_function", type=str, required=False)
     parser.add_argument("--mask_only",     type=str, required=False)
     parser.add_argument("--region_weight", type=str, required=False)
+    # 우리가 실험할 항목
+    parser.add_argument("--scheduler")                # Cosine…, StepLR …
     # Hydra 기본 config-name도 뽑아두기
     parser.add_argument("--config-name",   type=str, dest="config_name", required=False)
     return parser.parse_known_args()
@@ -53,6 +55,10 @@ if args.loss_function:
     if args.region_weight is not None:
         cmd.append(f"LossFunction.region_weight={args.region_weight}")
 
+# ───────────────── LRscheduler 처리 ─────────────────
+if args.scheduler:
+    cmd.append(f"LRscheduler={args.scheduler}")
+    
 # 4) 나머지 unknown 은 그대로 (다른 Hydra 플래그 있으면 받기)
 cmd += unknown
 

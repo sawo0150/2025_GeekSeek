@@ -1,14 +1,18 @@
 defaults:
   - _self_
-  - model: varnet_sweep   # 모델 설정 varnet_small / varnet_sweep
-  - data: cluster           # 데이터 경로 설정 - cluster / local_sangwonDesktop
-  # - LRscheduler: CosineAnnealingLR        # ⬅️  추가 - https://gaussian37.github.io/dl-pytorch-lr_scheduler/참고
-  - LossFunction: SSIM
+  - model: varnet_sweep   # 모델 설정
+  - data: cluster         # 데이터 경로 설정
+  - LRscheduler: CosineAnnealingLR        # ⬅️  추가 - https://gaussian37.github.io/dl-pytorch-lr_scheduler/참고
+  - LossFunction: SSIM+L1
   - training: base
+  - early_stop: early_stop    # 조기종료 기능 : early_stop or none
+  - evaluation: leaderboard
   - optimizer: adamw          # ⬅️ 새로 추가  
   # - aug: mraugment    # ⬅️ 새로 추가
+  - maskDuplicate: none       # acc4_acc8 or none
+  - maskAugment: none             # universal or basic or none 
   - collator: identity          # 또는 dynamicCompress or identity or identity_debug
-  - compressor: none  # ⬅️ 새로 추가       # gcc, scc, none
+  - compressor: scc  # ⬅️ 새로 추가       # gcc, scc, none
   - sampler: grouping          # 또는 grouping or identity
 
 # === Data Preprocessing === -  Mask → Crop → Compress → Tensor
@@ -18,7 +22,7 @@ crop_size: [384, 384]           # crop 할 (H, W) - 무조건 짝수로 지정
 # === 공통 학습 하이퍼파라미터 ===
 GPU_NUM: 0
 batch_size: 11
-num_epochs: 30
+num_epochs: 40
 lr: 1e-3
 report_interval: 500
 seed: 430

@@ -6,6 +6,8 @@ import time, math
 from pathlib import Path
 import copy
 from typing import Optional
+from importlib import import_module
+import inspect, math
 
 try:
     import wandb
@@ -33,7 +35,7 @@ from utils.logging.receptive_field import log_receptive_field
 
 import os
 
-def train_epoch(args, epoch, model, data_loader, optimizer,
+def train_epoch(args, epoch, model, data_loader, optimizer, scheduler,
                 loss_type, ssim_metric, metricLog_train,
                 scaler, amp_enabled, accum_steps):
     model.train()
@@ -82,6 +84,12 @@ def train_epoch(args, epoch, model, data_loader, optimizer,
                 scaler.update()
             else:
                 optimizer.step()
+
+            if scheduler is not None:
+                # OneCycleLR·CyclicLR 등은 매 iteration 호출이 권장
+                if isinstance(scheduler, (torch.optim.lr_scheduler.OneCycleLR,
+                                        torch.optim.lr_scheduler.CyclicLR)):
+                    scheduler.step()
         
         # -------- SSIM Metric (no grad) ----------------------------------
         loss_vals = current_loss.detach().cpu().tolist()                # list of floats, len=
@@ -224,6 +232,9 @@ def train(args):
                     'knee_x8':  2e-5}
     ssim_metric = SSIMLoss(mask_only = True, mask_threshold=mask_th).to(device=device)
 
+    print(f"[Hydra] loss_func ▶ {loss_type}")      # 디버그
+
+
     # ── 1. Optimizer 선택 (fallback: Adam) ─────────────────────────────
     optim_cfg = getattr(args, "optimizer", None)
     if optim_cfg is not None:
@@ -235,14 +246,85 @@ def train(args):
         optimizer = torch.optim.Adam(model.parameters(), args.lr)
     print(f"[Hydra] Optimizer ▶ {optimizer.__class__.__name__}")
 
+    # ─ train() 맨 앞쪽: train_loader 길이 한 번만 미리 계산 ─
+    temp_loader = create_data_loaders(
+        data_path=args.data_path_train,
+        args=args,
+        shuffle=True,
+        augmenter=None,            # 길이만 알면 되므로 Augment 미적용
+        mask_augmenter=None
+    )
+    effective_steps = math.ceil(len(temp_loader) / accum_steps)
+    del temp_loader                # 메모리 바로 반환
+
+    # ──────────────── LR Scheduler (옵션) ────────────────
+    # 0) Config → OmegaConf
+    sched_cfg_raw = getattr(args, "LRscheduler", None)
+    scheduler = None
+    if sched_cfg_raw is not None:
+        sched_cfg = OmegaConf.create(sched_cfg_raw)   # dict → OmegaConf
+
+        # 1) 공통 계산
+        temp_loader = create_data_loaders(
+            data_path=args.data_path_train,
+            args=args,
+            shuffle=True,
+            augmenter=None,
+            mask_augmenter=None,
+        )
+        effective_steps = math.ceil(len(temp_loader) / accum_steps)
+        del temp_loader
+
+        # 2) target class 로드 & 시그니처 분석
+        target_path = sched_cfg["_target_"]
+        mod_name, cls_name = target_path.rsplit(".", 1)
+        SchedulerCls = getattr(import_module(mod_name), cls_name)
+        sig = inspect.signature(SchedulerCls.__init__)
+        valid_keys = set(sig.parameters.keys())        # 허용 인수 목록
+
+        # 3) 필요한 key만 conditionally 추가
+        if "effective_steps" in sched_cfg and "effective_steps" not in valid_keys:
+            del sched_cfg["effective_steps"]
+
+        # CyclicLR
+        if cls_name == "CyclicLR":
+            sched_cfg["effective_steps"] = effective_steps
+            sched_cfg["step_size_up"] = sched_cfg.get(
+                "step_size_up", effective_steps * 2
+            )
+            sched_cfg["max_lr"] = sched_cfg.get("max_lr", args.lr * 6)
+
+        # OneCycleLR
+        if cls_name == "OneCycleLR":
+            sched_cfg["effective_steps"] = effective_steps
+            sched_cfg["total_steps"] = sched_cfg.get(
+                "total_steps", effective_steps * args.num_epochs
+            )
+            sched_cfg["max_lr"] = sched_cfg.get("max_lr", args.lr * 10)
+
+        # 4) instantiate (불필요 인수 제거 후)
+        clean_dict = {k: v for k, v in sched_cfg.items() if k in valid_keys or k.startswith("_")}
+        scheduler = instantiate(OmegaConf.create(clean_dict), optimizer=optimizer)
+        print(f"[Hydra] Scheduler ▶ {scheduler}")
+
+
     # ✨ Augmenter 객체 생성
     augmenter = None
+    print(getattr(args, "aug", None))
     if getattr(args, "aug", None):
         print("[Hydra] Augmenter를 생성합니다.")
         # args.aug에 mraugment.yaml에서 읽은 설정이 들어있습니다.
         augmenter = instantiate(args.aug)
 
-
+    # ① MaskAugmenter : 한 번만 생성
+    mask_augmenter = None
+    mask_aug_cfg = getattr(args, "maskAugment", {"enable": False})
+    print("[Hydra] mask_augmenter : ", mask_aug_cfg.get("enable", False))
+    if mask_aug_cfg.get("enable", False):
+        # 'enable' 키만 제거한 새 OmegaConf 객체를 만들어야 합니다.
+        cfg_clean = OmegaConf.create({k: v for k, v in mask_aug_cfg.items()
+                                    if k != "enable"})
+        mask_augmenter = instantiate(cfg_clean)
 
     # ── Resume logic (이제 model, optimizer가 정의된 이후) ──
     start_epoch   = 0
@@ -260,25 +342,21 @@ def train(args):
         val_loss_history = ckpt.get('val_loss_history', []) # 체크포인트에서 기록 복원
         print(f"[Resume] Loaded '{args.resume_checkpoint}' → epoch {start_epoch}, best_val_loss={best_val_loss:.4f}")
         # 재개 시, augmenter의 상태도 복원
+        # --- resume 영역 ---
+        if scheduler is not None and ckpt.get("scheduler") is not None:
+            scheduler.load_state_dict(ckpt["scheduler"])
         if augmenter:
             augmenter.val_loss_history.clear()
             augmenter.val_loss_history.extend(val_loss_history)
             print(f"[Resume] Augmenter val_loss history 복원 완료 ({len(val_loss_history)}개 항목)")
+        if mask_augmenter:
+            mask_augmenter.val_hist.clear()
+            mask_augmenter.val_hist.extend(val_loss_history)
+            print(f"[Resume] MaskAugmenter val_loss history 복원 완료 ({len(val_loss_history)}개 항목)")
+
 
     # ▸ 2. AMP scaler (옵션)
     scaler = GradScaler(enabled=amp_enabled)
-
-    print(f"[Hydra] loss_func ▶ {loss_type}")      # 디버그
-
-    # ──────────────── LR Scheduler (옵션) ────────────────
-    scheduler_cfg = getattr(args, "LRscheduler", None)   # flatten 단계에서 dict 로 들어옴
-    if scheduler_cfg is not None:
-        # dict → OmegaConf 로 감싸야 instantiate 가 제대로 동작
-        scheduler = instantiate(OmegaConf.create(scheduler_cfg),
-                                optimizer=optimizer)
-        print(f"[Hydra] Scheduler ▶ {scheduler}")      # 디버그
-    else:
-        scheduler = None
 
     print(args.data_path_train)
     print(args.data_path_val)
@@ -309,16 +387,21 @@ def train(args):
         if augmenter is not None:
             last_val_loss = val_loss_history[-1] if val_loss_history else None
             augmenter.update_state(current_epoch=epoch, val_loss=last_val_loss)
-
+        # ---- MaskAugmenter 스케줄 업데이트 ----
+        if mask_augmenter is not None:
+            last_val_loss = val_loss_history[-1] if val_loss_history else None
+            mask_augmenter.update_state(current_epoch=epoch, val_loss=last_val_loss)
+        
         train_loader = create_data_loaders(
             data_path=args.data_path_train, 
             args=args, 
             shuffle=True, 
-            augmenter=augmenter # 업데이트된 augmenter 전달
+            augmenter=augmenter, # 업데이트된 augmenter 전달
+            mask_augmenter=mask_augmenter
         )
 
         train_loss, train_time = train_epoch(args, epoch, model,
-                                             train_loader, optimizer,
+                                             train_loader, optimizer, scheduler,
                                              loss_type, ssim_metric, MetricLog_train,
                                              scaler, amp_enabled, accum_steps)
         val_loss,val_ssim, num_subjects, reconstructions, targets, inputs, val_time = validate(args, model, val_loader,
@@ -347,6 +430,7 @@ def train(args):
             'args': args,
             'model': model.state_dict(),
             'optimizer': optimizer.state_dict(),
+            "scheduler": scheduler.state_dict() if scheduler is not None else None,
             'best_val_ssim': best_val_ssim,
             'best_val_loss': best_val_loss,
             'exp_dir': str(args.exp_dir),

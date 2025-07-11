@@ -2,8 +2,15 @@
 Hydra + W&B 진입 스크립트
 FastMRI_challenge/main.py
 """
-import hydra, wandb, torch, sys, os
 from omegaconf import DictConfig, OmegaConf
+import math, operator
+# 안전한 계산용 최소 환경만 넘겨 줌 (※ __builtins__ 비우기)
+OmegaConf.register_new_resolver(
+    "calc",
+    lambda expr: eval(expr, {"__builtins__": {}, "math": math, "operator": operator.__dict__})
+)
+
+import hydra, wandb, torch, sys, os
 from collections.abc import Mapping
 from pathlib import Path
 from types import SimpleNamespace
@@ -37,6 +44,7 @@ def _flatten_cfg_to_args(cfg: DictConfig) -> SimpleNamespace:
             PRESERVE = {"model", "data", "LRscheduler", "LossFunction", 
                         "optimizer", "compressor", "collator", "sampler",
                         "evaluation", "early_stop", "maskDuplicate","maskAugment"
+                        
                         }
 
             # (1) 보존용 속성 먼저 세팅

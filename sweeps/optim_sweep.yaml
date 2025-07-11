@@ -2,6 +2,7 @@
 # wandb sweep sweeps/optim_sweep.yaml로 실행하면 됨
 method: grid
 name: optim_grid_2025
+project: optim_sweep        # ✅ 원하는 프로젝트 이름
 
 parameters:
   optimizer:
@@ -24,8 +25,10 @@ parameters:
 program: sweeps/train_entry.py     # ← 래퍼를 entrypoint 로
 command:
   - ${env}
-  - python
+  - python  
   - ${program}
+  # - "--config-name=sweeping_default"
+  - "--config-name=train"
   - ${args}                         # "--optimizer adam" 형태로 확장
 
 

@@ -1,0 +1,6 @@
+_target_: torch.optim.lr_scheduler.OneCycleLR
+_partial_: true                 # optimizer 는 instantiate 시 주입
+max_lr: ${lr}*10                # 기본 lr 의 10 ×
+total_steps: 0
+pct_start: 0.3                  # warm-up 비율
+anneal_strategy: cos
