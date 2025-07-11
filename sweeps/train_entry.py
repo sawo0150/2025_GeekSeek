@@ -5,6 +5,7 @@ import argparse, subprocess, sys, os
 def parse_args():
     parser = argparse.ArgumentParser()
     # ===== sweep 에서 넘길 파라미터들 =====
+    parser.add_argument("--epoch", type=int, required=False)
     parser.add_argument("--maskDuplicate",  type=str)
     # 기존 optimizer
     parser.add_argument("--optimizer",    type=str, required=False)
@@ -28,11 +29,19 @@ if args.config_name:
 # 2) maskDuplicate 단일 파라미터 sweep
 if args.maskDuplicate:
     cmd.append(f"maskDuplicate={args.maskDuplicate}")
+    if args.maskDuplicate == "acc4_acc8":
+        cmd.append(f"num_epochs={30}")     # ⚡️ 추가
+    else:
+        cmd.append(f"num_epochs={60}")     # ⚡️ 추가
+
 
 
 # 2) optimizer override
 if args.optimizer:
     cmd.append(f"optimizer={args.optimizer}")
+
+if args.epoch is not None:
+    cmd.append(f"num_epochs={args.epoch}")     # ⚡️ 추가
 
 # 3) LossFunction 그룹 선택 및 그룹 내 파라미터 override
 if args.loss_function:

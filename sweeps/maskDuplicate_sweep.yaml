@@ -10,17 +10,16 @@ command:
   - python
   - ${program}  
   - "--config-name=train"
-  - ${args}                           # wandb 가 자동으로 --maskDuplicate … 생성
-
+  - ${args}                # ← wandb가 파라미터를 자동으로 확장
+  
+# 검색 공간(두 개 파라미터 선언)
 parameters:
   maskDuplicate:
     values: [acc4_acc8, none]
+#   epoch:
+#     values: [40, 20]
 
-  epoch:            # <- 새로 추가
-    values: [30, 60]
-
-
-# maskDuplicate‑epoch 조합을 1:1 로 “필터”하는 제약
-parameter_constraints:
-  - (maskDuplicate == 'acc4_acc8' and epoch == 30) \
-    or (maskDuplicate == 'none' and epoch == 60)
+# # ‘짝을 맞춘’ 2개의 조합만 실행하고 싶으면 ↓ 추가
+# parameter_points_to_evaluate:
+#   - {maskDuplicate: acc4_acc8, epoch: 20}
+#   - {maskDuplicate: none,     epoch: 40}
