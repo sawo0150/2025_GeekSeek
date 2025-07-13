@@ -44,7 +44,7 @@ def _flatten_cfg_to_args(cfg: DictConfig) -> SimpleNamespace:
             PRESERVE = {"model", "data", "LRscheduler", "LossFunction", 
                         "optimizer", "compressor", "collator", "sampler",
                         "evaluation", "early_stop", "maskDuplicate","maskAugment"
-                        
+                        ,"aug"
                         }
 
             # (1) 보존용 속성 먼저 세팅

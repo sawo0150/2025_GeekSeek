@@ -1,7 +1,7 @@
 defaults:
   - _self_
   - model: varnet_small   # 모델 설정
-  - data: local_sangwonDesktop         # 데이터 경로 설정
+  - data: local_gpu         # 데이터 경로 설정
   - LRscheduler: StepLR        # ⬅️  추가 - https://gaussian37.github.io/dl-pytorch-lr_scheduler/참고
   - LossFunction: SSIM+L1
   - training: base
@@ -28,7 +28,7 @@ report_interval: 500
 seed: 430
 num_workers: 6
 
-exp_name : small_varnet_resume_test
+exp_name : small_varnet_resume_test1
 
 # these three are *required* by utils/data/load_data.py → create_data_loaders
 input_key:  kspace
