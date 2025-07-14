@@ -62,7 +62,8 @@ class SCCCompressor(BaseCompressor):
 
         # 4) 생성된 압축 행렬을 '전체' k-space에 적용
         kspace_flat = kspace.reshape(C, -1)             # (C, H*W)
-        compressed_flat = u_reduced.T @ kspace_flat     # (T, H*W)
+        # 켤레 전치(Hermitian transpose)를 사용하여 올바르게 압축
+        compressed_flat = u_reduced.conj().T @ kspace_flat     # (T, H*W) # ✅ 수정된 라인
 
         # 5) 원래 형태로 복원 (T, H, W)
         compressed = compressed_flat.reshape(self.target_coils, H, W)

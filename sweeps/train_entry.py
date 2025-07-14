@@ -60,6 +60,10 @@ if args.scheduler:
     cmd.append(f"LRscheduler={args.scheduler}")
     
 # 4) 나머지 unknown 은 그대로 (다른 Hydra 플래그 있으면 받기)
-cmd += unknown
-
+for arg in unknown:
+    if arg.startswith('--'):
+        cmd.append(arg[2:]) # 앞의 '--' 두 글자 제거
+    else:
+        cmd.append(arg)
+        
 sys.exit(subprocess.call(cmd))

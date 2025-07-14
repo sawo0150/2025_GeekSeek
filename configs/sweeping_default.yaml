@@ -12,7 +12,7 @@ defaults:
   - maskDuplicate: none       # acc4_acc8 or none
   - maskAugment: none             # universal or basic or none 
   - collator: identity          # 또는 dynamicCompress or identity or identity_debug
-  - compressor: scc  # ⬅️ 새로 추가       # gcc, scc, none
+  - compressor: none # ⬅️ 새로 추가       # gcc, scc, none
   - sampler: grouping          # 또는 grouping or identity
 
 # === Data Preprocessing === -  Mask → Crop → Compress → Tensor
@@ -22,13 +22,13 @@ crop_size: [384, 384]           # crop 할 (H, W) - 무조건 짝수로 지정
 # === 공통 학습 하이퍼파라미터 ===
 GPU_NUM: 0
 batch_size: 11
-num_epochs: 40
+num_epochs: 5
 lr: 1e-3
 report_interval: 500
 seed: 430
 num_workers: 11
 
-exp_name : small_varnet_resume_test
+exp_name : small_varnet_resume_test11
 
 # these three are *required* by utils/data/load_data.py → create_data_loaders
 input_key:  kspace

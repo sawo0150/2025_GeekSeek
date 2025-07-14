@@ -1,3 +1,5 @@
+# train.yaml
+
 defaults:
   - _self_
   - model: varnet_small   # 모델 설정
@@ -18,6 +20,7 @@ defaults:
 # === Data Preprocessing === -  Mask → Crop → Compress → Tensor
 use_crop: true                  # spatial crop 사용 여부
 crop_size: [384, 384]           # crop 할 (H, W) - 무조건 짝수로 지정
+use_noise_padding: true         # ✨ [추가] 패딩 시 노이즈 보간 사용 여부 (true or false)
 
 # === 공통 학습 하이퍼파라미터 ===
 GPU_NUM: 0
