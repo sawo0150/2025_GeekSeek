@@ -1,4 +1,4 @@
-# configs/compress/gcc.yaml
+# configs/compressor/gcc.yaml
 
 # Hydra가 이 파일을 읽어 어떤 파이썬 클래스를 객체로 만들지 지정합니다.
 _target_: utils.data.coil_compression.GCCCompressor

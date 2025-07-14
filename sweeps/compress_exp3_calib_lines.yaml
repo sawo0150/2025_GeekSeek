@@ -1,0 +1,34 @@
+# sweeps/compress_exp3_calib_lines.yaml
+# 실험: 보정 라인 수에 따른 성능 변화 측정
+program: sweeps/train_entry.py
+method: grid
+metric:
+  name: val/SSIM_mean
+  goal: maximize
+
+parameters:
+  config-name:
+    value: sweeping_default
+  collator:
+    value: dynamicCompress
+  compressor:
+    value: scc
+    
+  # 압축률은 8로 고정
+  compressor.target_coils:
+    value: 8
+    
+  # 보정 라인 수를 변경하며 테스트
+  compressor.num_calib_lines:
+    values: [128,64,32, 24, 16]
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - --config-name=${item.config-name}
+  - collator=${item.collator}
+  - compressor=${item.compressor}
+  - compressor.target_coils=${item.compressor.target_coils}
+  - compressor.num_calib_lines=${item.compressor.num_calib_lines}
+  - ${args}
