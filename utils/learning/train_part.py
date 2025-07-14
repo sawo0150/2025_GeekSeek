@@ -141,6 +141,7 @@ def validate(args, model, data_loader, acc_val, epoch, loss_type, ssim_metric):
             target  = target.cuda(non_blocking=True)
             maximum = maximum.cuda(non_blocking=True)
             output = model(kspace, mask)
+            # print("max alloc MB:", torch.cuda.max_memory_allocated() / 1024**2)
             
             for i in range(output.shape[0]):    # validate Batch 개수 고려해서 for로 묶었는듯
                 reconstructions[fnames[i]][int(slices[i])] = output[i].cpu().numpy()

@@ -1,5 +1,7 @@
 # VarNet 확장 버전
 net_name: varnet_large
-cascade: 20
+cascade: 40
 chans: 9
 sens_chans: 8
+
+# checkpointing 켰다고 가정 : 7445

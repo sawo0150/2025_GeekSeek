@@ -169,6 +169,8 @@ def create_data_loaders(data_path, args, shuffle=False, isforward=False,
     # # Crop OFF시 batch_size 강제 1
     # use_crop = getattr(args, 'use_crop', False)
     batch_size = args.batch_size
+    if not is_train:
+        batch_size = args.val_batch_size
     # if not use_crop:
     #     if batch_size != 1:
     #         print("[WARN] use_crop=False 이므로 batch_size=1로 강제합니다.")
