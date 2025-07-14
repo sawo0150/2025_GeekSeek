@@ -1,0 +1,42 @@
+_target_: utils.augmentations.mraugmenter.MRAugmenter
+
+# --- 공통 설정 ---
+aug_on: false
+aug_strength: 0.9           # 최대 증강 확률 (p_max)
+aug_delay: 0             # 증강을 시작하기 전 대기할 에포크 수
+weight_dict:                # 각 증강 기법의 가중치
+  fliph: 0.5
+  flipv: 0.5
+  rotate: 1.0
+  scale: 1.0
+  shift: 1.0
+  shear: 0.5
+
+# --- 스케줄러 선택 ---
+# 'constant': 항상 p=aug_strength
+# 'epoch': 에포크 진행률에 따라 p 증가
+# 'val_loss': validation loss 기울기에 따라 p 증가
+aug_schedule_mode: 'constant' 
+
+# --- 스케일링 방식 선택 ---
+# 'ramp': 선형적으로 증가
+# 'exp': 지수적으로 증가
+aug_schedule_type: 'ramp'
+
+# --- 'epoch' 모드 전용 파라미터 ---
+max_epochs: ${num_epochs}      # train.yaml의 num_epochs 값을 그대로 사용
+
+# --- 'val_loss' 모드 전용 파라미터 ---
+val_loss_window_size: 5      # 기울기 계산에 사용할 과거 val_loss의 개수
+val_loss_grad_start: -0.05   # p=0으로 간주할 기울기 (가파른 개선). 더 가파르면 계속 p=0.
+val_loss_grad_plateau: -0.001 # p=p_max로 간주할 기울기 (개선 정체). 더 완만하면 계속 p=p_max.
+
+# --- 'exp' 스케일링 방식 전용 파라미터 ---
+aug_exp_decay: 6.0
+
+# --- 변환 파라미터 ---
+# ┕ [수정] shift_extent와 max_shear_angle 파라미터 추가
+max_rotation_angle: 15.0
+scale_range: [0.85, 1.15]
+shift_extent: 5.0           # 이동(shift) 증강의 표준편차 (픽셀 단위)
+max_shear_angle: 10.0         # 전단(shear) 변환의 최대 각도 (좌우)

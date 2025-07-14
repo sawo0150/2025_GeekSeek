@@ -1,0 +1,4 @@
+# _target_ 에 실제 클래스 경로를 지정
+_target_: utils.data.transforms.CenterCropZeroPad
+# train.yaml 의 crop_size 항목을 참조
+target_size: ${..crop_size}

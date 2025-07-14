@@ -4,6 +4,7 @@ import torch
 import numpy as np
 from math import exp
 from collections import deque
+from typing import Tuple
 import torchvision.transforms.functional as TF
 
 # --- 토치 버전 호환성을 위한 InterpolationMode 설정 ---
@@ -217,6 +218,31 @@ class MRAugmenter:
             
         return image_tensor
 
+    def _center_crop_and_pad(self, arr: np.ndarray, target_shape: Tuple[int,int]) -> np.ndarray:
+        """
+        2D numpy array arr를 target_shape (H0, W0)에 맞춰
+        중앙 크롭 후 패딩합니다.
+        """
+        H0, W0 = target_shape
+        h, w = arr.shape
+        # crop size
+        Hc, Wc = min(h, H0), min(w, W0)
+        top, left = (h - Hc)//2, (w - Wc)//2
+        cropped = arr[top:top+Hc, left:left+Wc]
+
+        pad_h = H0 - Hc
+        pad_w = W0 - Wc
+        if pad_h > 0 or pad_w > 0:
+            pad_top = pad_h//2
+            pad_bottom = pad_h - pad_top
+            pad_left = pad_w//2
+            pad_right = pad_w - pad_left
+            # constant padding with zeros
+            cropped = np.pad(cropped,
+                             ((pad_top, pad_bottom), (pad_left, pad_right)),
+                             mode='constant', constant_values=0)
+        return cropped
+    
     def __call__(self, mask, kspace_np, target_np, attrs, fname, slice_idx):
         """
         데이터 로더의 transform 파이프라인의 일부로 동작합니다.
@@ -241,5 +267,9 @@ class MRAugmenter:
         aug_kspace = self._fft(aug_image)
         aug_target = self._rss(aug_image)
 
+        # 원본 target_np shape에 맞춰 center-crop & pad 수행
+        final_target = self._center_crop_and_pad(aug_target.numpy(), target_np.shape)
+
+
         # 다음 transform(e.g., cropping)을 위해 numpy 배열로 변환하여 반환
-        return mask, aug_kspace.numpy(), aug_target.numpy(), attrs, fname, slice_idx
+        return mask, aug_kspace.numpy(), final_target, attrs, fname, slice_idx

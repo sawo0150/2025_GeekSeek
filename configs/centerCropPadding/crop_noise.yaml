@@ -1,0 +1,3 @@
+_target_: utils.data.transforms.CenterCropNoisePad
+target_size: ${..crop_size}
+corner_size: ${..corner_size}  # train.yaml 에 corner_size 정의 필요
