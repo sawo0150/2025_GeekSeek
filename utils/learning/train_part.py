@@ -474,7 +474,7 @@ def train(args):
             wandb.log({"epoch": epoch,
                        "lr": optimizer.param_groups[0]['lr']}, step=epoch*dup_mul)
             
-            if getattr(args, "wandb_use_receptiveField", False) and wandb and getattr(args, 'use_crop', False):
+            if getattr(args, "wandb_use_receptiveField", False) and wandb:
                 # ┕ [추가] 매 에폭의 검증 단계 후, ERF를 계산하고 W&B에 로깅합니다.
                 # crop 안할시 receptive Field 계산 불가능 -> 이거 해결용..
                 print("Calculating and logging effective receptive field...")

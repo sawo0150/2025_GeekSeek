@@ -1,0 +1,3 @@
+amp:           false        # mixed-precision
+checkpointing: true        # gradient_checkpoint
+accum_steps:   10            # gradient_accumulation (1이면 이 기능 끄는거임.)

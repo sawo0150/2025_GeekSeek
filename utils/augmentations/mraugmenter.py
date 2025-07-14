@@ -214,7 +214,7 @@ class MRAugmenter:
             applied_transforms.append('shear')
             
         # if applied_transforms:
-            # print(f"[Augmenter] Applied: {', '.join(applied_transforms)}")
+        #     print(f"[Augmenter] Applied: {', '.join(applied_transforms)}")
             
         return image_tensor
 

@@ -33,7 +33,15 @@ class DuplicateMaskDataset(Dataset):
         if hasattr(base_ds, "coil_counts"):
             self.coil_counts = np.repeat(base_ds.coil_counts,
                                          self.dup).tolist()
-
+        # ✨ sample_shapes 도 각 base 항목마다 dup 배수로 늘려서 전달
+        if hasattr(base_ds, "sample_shapes"):
+            # base_ds.sample_shapes 가 [(C,H,W), …] 길이 N이라면
+            # [ (C,H,W), (C,H,W), … ] 길이 N*dup 로 복제
+            self.sample_shapes = [
+                shape
+                for shape in base_ds.sample_shapes
+                for _ in range(self.dup)
+            ]
     # --------------------------------------------------------------
     def __len__(self):
         return len(self.base_ds) * self.dup

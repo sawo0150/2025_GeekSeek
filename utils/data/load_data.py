@@ -55,15 +55,24 @@ class SliceData(Dataset):
                 self.kspace_examples += [(fname, i) for i in range(num_slices)]
             self.image_examples = self.kspace_examples
 
-        coil_map = {}
+        # coil_map = {}
+        shape_map = {}
         for entry in self.kspace_examples:
             fname = entry[0]
             key = str(fname)
-            if key not in coil_map:
+            # if key not in coil_map:
+            if key not in shape_map:
                 with h5py.File(fname, 'r') as hf:
                     arr = hf[self.input_key]
-                    coil_map[key] = arr.shape[1]
-        self.coil_counts = [coil_map[str(entry[0])] for entry in self.kspace_examples]
+                    # coil_map[key] = arr.shape[1]
+                    # arr.shape == (num_slices, C, H, W)
+                    shape_map[key] = tuple(arr.shape[1:])
+
+        # self.coil_counts = [coil_map[str(entry[0])] for entry in self.kspace_examples]
+        # 기존 coil_counts 유지
+        self.coil_counts = [shape[0] for shape in (shape_map[str(e[0])] for e in self.kspace_examples)]
+        # 새로운 sample_shapes 속성 추가
+        self.sample_shapes = [shape_map[str(entry[0])] for entry in self.kspace_examples]
 
     def _get_metadata(self, fname):
         with h5py.File(fname, "r") as hf:
@@ -157,36 +166,36 @@ def create_data_loaders(data_path, args, shuffle=False, isforward=False,
     
     collate_fn = default_collate if isforward else instantiate(args.collator, _recursive_=False)
 
-    # Crop OFF시 batch_size 강제 1
-    use_crop = getattr(args, 'use_crop', False)
+    # # Crop OFF시 batch_size 강제 1
+    # use_crop = getattr(args, 'use_crop', False)
     batch_size = args.batch_size
-    if not use_crop:
-        if batch_size != 1:
-            print("[WARN] use_crop=False 이므로 batch_size=1로 강제합니다.")
-        batch_size = 1
+    # if not use_crop:
+    #     if batch_size != 1:
+    #         print("[WARN] use_crop=False 이므로 batch_size=1로 강제합니다.")
+    #     batch_size = 1
 
     # 2) sampler 인스턴스 하나만 만들기
     if isforward:
         sampler = GroupByCoilBatchSampler(
             data_source=data_storage,
-            coil_counts=getattr(data_storage, "coil_counts", None),
+            sample_shapes=getattr(data_storage, "sample_shapes", None),
             batch_size=batch_size,
             shuffle=False,
         )
     else:
         sampler = instantiate(
             args.sampler, data_source=data_storage,
-            coil_counts=getattr(data_storage, "coil_counts", None),
+            sample_shapes=getattr(data_storage, "sample_shapes", None),
             batch_size=batch_size,
             shuffle=shuffle,
             _recursive_=False
         )
 
     num_workers = args.num_workers
-    if not use_crop and isforward:
-        if num_workers != 0:
-            print("[WARN] use_crop=False + isforward=True => num_workers=0으로 강제!")
-        num_workers = 0
+    # if not use_crop and isforward:
+    #     if num_workers != 0:
+    #         print("[WARN] use_crop=False + isforward=True => num_workers=0으로 강제!")
+    #     num_workers = 0
 
     # 3) DataLoader 에 넘겨줄 인자 결정
     #    sampler 가 BatchSampler 계열이면 batch_sampler=, 아니면 sampler= 로

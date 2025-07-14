@@ -2,6 +2,6 @@
 evaluation:
   enable:            true        # false면 완전 비활성
   every_n_epochs:    1           # 5·10·20 … 자유  
-  batch_size:        5           # reconstruct용
+  batch_size:        15           # reconstruct용
   leaderboard_root:  ${data.data_path_eval}
   output_key:        reconstruction
