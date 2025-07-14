@@ -1,6 +1,6 @@
 import h5py, re
 import random
-from utils.data.transforms import DataTransform, CenterCropOrPad
+from utils.data.transforms import DataTransform
 from torch.utils.data import Dataset, DataLoader
 from hydra.utils import instantiate, get_class
 from omegaconf import OmegaConf   # ← 추가
@@ -135,7 +135,8 @@ class SliceData(Dataset):
         return (*sample, cat) if not self.forward else sample
 
 
-def create_data_loaders(data_path, args, shuffle=False, isforward=False, augmenter=None, mask_augmenter=None):
+def create_data_loaders(data_path, args, shuffle=False, isforward=False, 
+                        augmenter=None, mask_augmenter=None, is_train=False):
     if isforward == False:
         max_key_ = args.max_key
         target_key_ = args.target_key
@@ -158,7 +159,8 @@ def create_data_loaders(data_path, args, shuffle=False, isforward=False, augment
 
     # (2) Spatial crop (토글)
     if getattr(args, 'use_crop', False):
-        transforms.append(CenterCropOrPad(target_size=tuple(args.crop_size)))
+        # transforms.append(CenterCropOrPad(target_size=tuple(args.crop_size)))
+        transforms.append(instantiate(args.centerCropPadding))
 
     # # (3) Coil compression (토글)
     # if getattr(args, "compressor", None):
@@ -181,7 +183,7 @@ def create_data_loaders(data_path, args, shuffle=False, isforward=False, augment
 
     # 2)  *** Duplicate 적용 (crop 前) ***
     dup_cfg = getattr(args,"maskDuplicate",{"enable":False})
-    if dup_cfg.get("enable",False) and not isforward:
+    if dup_cfg.get("enable",False) and not isforward and is_train: 
         dup_cfg_clean = OmegaConf.create({k:v for k,v in dup_cfg.items()
                                           if k!="enable"})
         duped_ds = instantiate(dup_cfg_clean, base_ds=raw_ds,
@@ -198,13 +200,21 @@ def create_data_loaders(data_path, args, shuffle=False, isforward=False, augment
     else:
         collate_fn = instantiate(args.collator, _recursive_=False)
 
+    # Crop OFF시 batch_size 강제 1
+    use_crop = getattr(args, 'use_crop', False)
+    batch_size = args.batch_size
+    if not use_crop:
+        if batch_size != 1:
+            print("[WARN] use_crop=False 이므로 batch_size=1로 강제합니다.")
+        batch_size = 1
+
     # 2) sampler 인스턴스 하나만 만들기
     if isforward:
         # ⭐ 리더보드/submit 모드 : 무조건 GroupByCoilBatchSampler 사용
         sampler = GroupByCoilBatchSampler(
             data_source=data_storage,
             coil_counts=getattr(data_storage, "coil_counts", None),
-            batch_size=args.batch_size,
+            batch_size=batch_size,
             shuffle=False,
         )
     else:
@@ -212,10 +222,16 @@ def create_data_loaders(data_path, args, shuffle=False, isforward=False, augment
             args.sampler,
             data_source=data_storage,
             coil_counts=getattr(data_storage, "coil_counts", None),
-            batch_size=args.batch_size,
+            batch_size=batch_size,
             shuffle=shuffle,
             _recursive_=False
         )
+
+    num_workers = args.num_workers
+    if not use_crop and isforward:
+        if num_workers != 0:
+            print("[WARN] use_crop=False + isforward=True => num_workers=0으로 강제!")
+        num_workers = 0
 
     # 3) DataLoader 에 넘겨줄 인자 결정
     #    sampler 가 BatchSampler 계열이면 batch_sampler=, 아니면 sampler= 로
@@ -223,14 +239,14 @@ def create_data_loaders(data_path, args, shuffle=False, isforward=False, augment
         return DataLoader(
             dataset=data_storage,
             batch_sampler=sampler,
-            num_workers=args.num_workers,
+            num_workers=num_workers,
             collate_fn=collate_fn
         )
     else:
         return DataLoader(
             dataset=data_storage,
             sampler=sampler,
-            batch_size=args.batch_size,
-            num_workers=args.num_workers,
+            batch_size=batch_size,
+            num_workers=num_workers,
             collate_fn=collate_fn
         )
