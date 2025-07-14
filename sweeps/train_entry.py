@@ -7,6 +7,9 @@ def parse_args():
     # ===== sweep 에서 넘길 파라미터들 =====
     parser.add_argument("--epoch", type=int, required=False)
     parser.add_argument("--maskDuplicate",  type=str)
+    # mixed-precision sweep을 위해 amp 플래그 추가
+    parser.add_argument("--amp", type=str, required=False,
+                        help="mixed-precision on/off (true/false)")
     # 기존 optimizer
     parser.add_argument("--optimizer",    type=str, required=False)
     # 추가로 sweep 할 파라미터들
@@ -59,6 +62,11 @@ if args.loss_function:
 if args.scheduler:
     cmd.append(f"LRscheduler={args.scheduler}")
     
+# ─────────────────── amp 처리 ────────────────────
+if args.amp is not None:
+    # Hydra group 'training' 내부의 amp 옵션을 override
+    cmd.append(f"training.amp={args.amp}")
+
 # 4) 나머지 unknown 은 그대로 (다른 Hydra 플래그 있으면 받기)
 for arg in unknown:
     if arg.startswith('--'):

@@ -1,0 +1,17 @@
+# wandb sweep sweeps/amp_sweep.yaml
+method: grid
+name: amp_grid_2025_a100
+project: AMP_sweep        # ✅ 원하는 프로젝트 이름
+
+parameters:
+  amp:
+    values: [false, true]
+
+program: sweeps/train_entry.py
+command:
+  - ${env}
+  - python
+  - ${program}
+  # - "--config-name=sweeping_default"   # 기본 Hydra config
+  - "--config-name=train"
+  - ${args}                            # ↑ parameters 가 여기로 풀림
