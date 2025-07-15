@@ -1,6 +1,7 @@
 # VarNet 확장 버전
-net_name: varnet_large
-cascade: 40
+_target_: utils.model.varnet.VarNet
+
+num_cascades: 40
 chans: 9
 sens_chans: 8
 

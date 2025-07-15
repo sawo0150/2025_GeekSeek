@@ -2,13 +2,13 @@
 
 defaults:
   - _self_
-  - model: varnet_small   # 모델 설정  varnet_sweep2
-  - data: local_sangwonDesktop         # 데이터 경로 설정
+  - model: varnet_sweep2   # 모델 설정
+  - data: local_vessel         # 데이터 경로 설정
   - LRscheduler: ExponentialLR        # ⬅️  추가 - https://gaussian37.github.io/dl-pytorch-lr_scheduler/참고
   - LossFunction: SSIM+L1
-  - training: base          # base or vessl_vramMin
+  - training: vessl_vramMin          # base or vessl_vramMin
   - early_stop: none    # 조기종료 기능 : early_stop or none
-  - evaluation: leaderboard
+  - evaluation: leaderboard_vessl
   - optimizer: nadam          # ⬅️ 새로 추가  
   - aug: mraugment    # ⬅️ 새로 추가 none or mraugment
   - centerCropPadding: crop_kspace # crop_zero or crop_noise or crop_kspace
@@ -25,15 +25,15 @@ corner_size : 16
 
 # === 공통 학습 하이퍼파라미터 ===
 GPU_NUM: 0
-batch_size: 2
-val_batch_size: 5     # 검증 배치 크기 (추가)
+batch_size: 1
+val_batch_size: 3     # 검증 배치 크기 (추가)
 num_epochs: 50
 lr: 1e-3
 report_interval: 500
 seed: 430
-num_workers: 4
+num_workers: 6
 
-exp_name : model_intantiate_eval_test
+exp_name : varnet_SOTA_ver2
 
 # these three are *required* by utils/data/load_data.py → create_data_loaders
 input_key:  kspace
@@ -41,7 +41,7 @@ target_key: image_label
 max_key:    max
 
 wandb:
-  project: fastmri-2025
+  project: Vessel_fastmri-2025
   entity: swpants05-seoul-national-university        # W&B 팀/계정
   use_wandb: true           # false 이면 모든 wandb 로그 함수가 noop
   max_vis_per_cat: 5        # epoch 마다 카테고리별 이미지 수 (0 → 안 올림)

@@ -107,7 +107,7 @@ class SliceData(Dataset):
             with h5py.File(image_fname, "r") as hf:
                 target = hf[self.target_key][dataslice]
                 attrs = dict(hf.attrs)
-            
+            attrs['cat'] = cat
         sample = self.transform(mask, input_data, target, attrs, kspace_fname.name, dataslice)
         return (*sample, cat) if not self.forward else sample
 
