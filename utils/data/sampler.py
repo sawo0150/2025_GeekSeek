@@ -28,7 +28,8 @@ class GroupByCoilBatchSampler(BatchSampler):
     같은 coil 개수끼리 idx 를 batch_size 단위로 묶어서 리턴.
     """
     def __init__(self,
-                 coil_counts,        # list of int (len == dataset size)
+                #  coil_counts,        # list of int (len == dataset size)
+                 sample_shapes,      # list of tuple (C, H, W) per sample
                  batch_size: int,
                  shuffle: bool = True,
                  **kwargs):
@@ -37,17 +38,22 @@ class GroupByCoilBatchSampler(BatchSampler):
         self.batch_size = batch_size
         self.shuffle = shuffle
 
-        # 1) coil별로 인덱스 그룹화
+        # # 1) coil별로 인덱스 그룹화
+        # groups = defaultdict(list)
+        # for idx, c in enumerate(coil_counts):
+        #     groups[c].append(idx)
+
+        # 1) shape별로 인덱스 그룹화
         groups = defaultdict(list)
-        for idx, c in enumerate(coil_counts):
-            groups[c].append(idx)
+        for idx, shape in enumerate(sample_shapes):
+            groups[shape].append(idx)
 
         # 2) 그룹 내 shuffle
         if shuffle:
             for g in groups.values():
                 random.shuffle(g)
 
-        # 3) batch_size 단위로 slice
+        # 3) batch_size 단위로 slice (나머지 작은 배치도 그대로 포함)
         self.batches = []
         for g in groups.values():
             for i in range(0, len(g), batch_size):

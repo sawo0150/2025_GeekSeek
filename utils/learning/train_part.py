@@ -141,6 +141,7 @@ def validate(args, model, data_loader, acc_val, epoch, loss_type, ssim_metric):
             target  = target.cuda(non_blocking=True)
             maximum = maximum.cuda(non_blocking=True)
             output = model(kspace, mask)
+            # print("max alloc MB:", torch.cuda.max_memory_allocated() / 1024**2)
             
             for i in range(output.shape[0]):    # validate Batch 개수 고려해서 for로 묶었는듯
                 reconstructions[fnames[i]][int(slices[i])] = output[i].cpu().numpy()
@@ -202,6 +203,9 @@ def train(args):
     dup_cfg   = getattr(args, "maskDuplicate", {"enable": False})
     dup_mul   = (len(dup_cfg.get("accel_cfgs", []))
                 if dup_cfg.get("enable", False) else 1)
+    
+    print("[Hydra-visLogging] ", getattr(args, "wandb_use_visLogging", False))
+    print("[Hydra-receptiveField] ", getattr(args, "wandb_use_receptiveField", False))
     
     print(f"[Hydra-maskDuplicate] {dup_cfg}")
 
@@ -271,6 +275,7 @@ def train(args):
             shuffle=True,
             augmenter=None,
             mask_augmenter=None,
+            is_train=True,      # ★ train만 True
         )
         effective_steps = math.ceil(len(temp_loader) / accum_steps)
         del temp_loader
@@ -375,7 +380,12 @@ def train(args):
     print(f"[Hydra-eval] lb_enable={lb_enable}, lb_every={lb_every}")
 
     # train_loader = create_data_loaders(data_path = args.data_path_train, args = args, shuffle=True) # 매 에폭마다 생성 예정
-    val_loader = create_data_loaders(data_path=args.data_path_val, args=args, augmenter=None)
+    val_loader = create_data_loaders(data_path=args.data_path_val, 
+                                     args=args, 
+                                     augmenter=None,
+                                     mask_augmenter=None,
+                                     is_train=False,     # ★ val/test는 False)
+    )
     
     val_loss_log = np.empty((0, 2))
 
@@ -397,7 +407,8 @@ def train(args):
             args=args, 
             shuffle=True, 
             augmenter=augmenter, # 업데이트된 augmenter 전달
-            mask_augmenter=mask_augmenter
+            mask_augmenter=mask_augmenter,
+            is_train=True      # ★ train만 True
         )
 
         train_loss, train_time = train_epoch(args, epoch, model,
@@ -455,23 +466,27 @@ def train(args):
             MetricLog_train.log(epoch*dup_mul)
             MetricLog_val.log(epoch*dup_mul)
             # 추가 전역 정보(learning-rate 등)만 개별로 저장
-            log_epoch_samples(reconstructions, targets,
-                            step=epoch*dup_mul,
-                            max_per_cat=args.max_vis_per_cat)   # ← config 값 사용
+            if getattr(args, "wandb_use_visLogging", False) and wandb:
+                print("visual Logging...")
+                log_epoch_samples(reconstructions, targets,
+                                step=epoch*dup_mul,
+                                max_per_cat=args.max_vis_per_cat)   # ← config 값 사용
             
             wandb.log({"epoch": epoch,
                        "lr": optimizer.param_groups[0]['lr']}, step=epoch*dup_mul)
             
-            
-            # ┕ [추가] 매 에폭의 검증 단계 후, ERF를 계산하고 W&B에 로깅합니다.
-            print("Calculating and logging effective receptive field...")
-            log_receptive_field(
-                model=model,
-                data_loader=val_loader,
-                epoch=epoch,
-                device=device
-            )
-            print("Effective receptive field logged to W&B.")
+            if getattr(args, "wandb_use_receptiveField", False) and wandb:
+                # ┕ [추가] 매 에폭의 검증 단계 후, ERF를 계산하고 W&B에 로깅합니다.
+                # crop 안할시 receptive Field 계산 불가능 -> 이거 해결용..
+                print("Calculating and logging effective receptive field...")
+                log_receptive_field(
+                    model=model,
+                    data_loader=val_loader,
+                    epoch=epoch,
+                    device=device
+                )
+                print("Effective receptive field logged to W&B.")
+
             if is_new_best:
                 wandb.save(str(args.exp_dir / "best_model.pt"))
 

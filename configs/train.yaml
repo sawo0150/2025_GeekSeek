@@ -2,36 +2,38 @@
 
 defaults:
   - _self_
-  - model: varnet_small   # 모델 설정
-  - data: local_gpu         # 데이터 경로 설정
-  - LRscheduler: StepLR        # ⬅️  추가 - https://gaussian37.github.io/dl-pytorch-lr_scheduler/참고
+  - model: varnet_sweep2   # 모델 설정
+  - data: local_sangwonDesktop         # 데이터 경로 설정
+  - LRscheduler: ExponentialLR        # ⬅️  추가 - https://gaussian37.github.io/dl-pytorch-lr_scheduler/참고
   - LossFunction: SSIM+L1
-  - training: base
+  - training: vessl_vramMin          # base or vessl_vramMin
   - early_stop: none    # 조기종료 기능 : early_stop or none
   - evaluation: leaderboard
-  - optimizer: adamw          # ⬅️ 새로 추가  
-  - aug: mraugment    # ⬅️ 새로 추가
-  - maskDuplicate: none       # acc4_acc8 or none
+  - optimizer: nadam          # ⬅️ 새로 추가  
+  - aug: mraugment    # ⬅️ 새로 추가 none or mraugment
+  - centerCropPadding: crop_kspace # crop_zero or crop_noise or crop_kspace
+  - maskDuplicate: acc4_acc8       # acc4_acc8 or none
   - maskAugment: none             # universal or basic or none 
   - collator: identity          # 또는 dynamicCompress or identity or identity_debug
   - compressor: scc  # ⬅️ 새로 추가       # gcc, scc, none
   - sampler: grouping          # 또는 grouping or identity
 
 # === Data Preprocessing === -  Mask → Crop → Compress → Tensor
-use_crop: true                  # spatial crop 사용 여부
+use_crop: false                  # spatial crop 사용 여부
 crop_size: [384, 384]           # crop 할 (H, W) - 무조건 짝수로 지정
-use_noise_padding: true         # ✨ [추가] 패딩 시 노이즈 보간 사용 여부 (true or false)
+corner_size : 16
 
 # === 공통 학습 하이퍼파라미터 ===
 GPU_NUM: 0
-batch_size: 4
-num_epochs: 20
+batch_size: 1
+val_batch_size: 5     # 검증 배치 크기 (추가)
+num_epochs: 50
 lr: 1e-3
 report_interval: 500
 seed: 430
 num_workers: 6
 
-exp_name : small_varnet_resume_test1
+exp_name : centercrop_debugging
 
 # these three are *required* by utils/data/load_data.py → create_data_loaders
 input_key:  kspace
@@ -43,3 +45,6 @@ wandb:
   entity: swpants05-seoul-national-university        # W&B 팀/계정
   use_wandb: true           # false 이면 모든 wandb 로그 함수가 noop
   max_vis_per_cat: 5        # epoch 마다 카테고리별 이미지 수 (0 → 안 올림)
+
+  use_visLogging: true
+  use_receptiveField: false

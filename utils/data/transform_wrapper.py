@@ -13,6 +13,9 @@ class TransformWrapper(Dataset):
         # coil_counts 전달 (Sampler 호환)
         if hasattr(base_ds, "coil_counts"):
             self.coil_counts = base_ds.coil_counts
+        # ✨ sample_shapes 전달 (GroupByCoilBatchSampler 호환)
+        if hasattr(base_ds, "sample_shapes"):
+            self.sample_shapes = base_ds.sample_shapes
 
     def __len__(self): return len(self.base_ds)
 
