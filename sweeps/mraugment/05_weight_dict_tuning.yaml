@@ -1,0 +1,35 @@
+# 6단계: weight_dict 튜닝
+program: sweeps/mraugment/train_entry.py
+method: bayes
+metric:
+  name: val_ssim
+  goal: maximize
+parameters:
+  config-name:
+    value: sweeping_default
+    
+  # 이전 단계들에서 찾은 최적값으로 모두 고정
+  aug_schedule_mode:
+    value: 'epoch'
+  aug_schedule_type:
+    value: 'ramp'
+  aug_strength:
+    value: 0.9 # 5단계에서 찾은 최적값으로 수정
+  
+  # 기하학적 변환 가중치를 중심으로 탐색
+  wd_rotate:
+    distribution: uniform
+    min: 0.1
+    max: 0.8
+  wd_scale:
+    distribution: uniform
+    min: 0.1
+    max: 0.8
+  wd_shift:
+    distribution: uniform
+    min: 0.1
+    max: 0.8
+  wd_shear:
+    distribution: uniform
+    min: 0.1
+    max: 0.8

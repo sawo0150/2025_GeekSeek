@@ -1,0 +1,21 @@
+# 2단계: exp_decay 튜닝
+program: sweeps/mraugment/train_entry.py
+method: bayes # 베이지안 최적화로 효율적으로 탐색
+metric:
+  name: val_ssim
+  goal: maximize
+parameters:
+  config-name:
+    value: sweeping_default
+  
+  # 1단계 결과 가장 좋았던 모드로 고정 (예: epoch)
+  aug_schedule_mode:
+    value: 'epoch' 
+  
+  aug_schedule_type:
+    value: 'exp'
+    
+  aug_exp_decay:
+    distribution: uniform
+    min: 2.0
+    max: 10.0
