@@ -35,6 +35,6 @@ mask_specs:
     cf:    [0.07, 0.10]    # #   center-fraction 실수 균등 샘플
   magic_fraction:   # ▸ MagicMaskFractionFunc
     prob: 0.10
-    accel: 8               # 단일 값
-    cf:    0.04            # 단일 값
+    accel: [4, 8]               # 단일 값
+    cf:    [0.07, 0.10]            # 단일 값
 allow_any_combination: true   # accel 과 cf 를 교차 짝짓기 허용 여부
