@@ -19,3 +19,7 @@ parameters:
     distribution: uniform
     min: 2.0
     max: 10.0
+
+     # +++ 이 부분을 추가하여 maskDuplicate 기능을 비활성화합니다 +++
+  maskDuplicate:
+    value: none

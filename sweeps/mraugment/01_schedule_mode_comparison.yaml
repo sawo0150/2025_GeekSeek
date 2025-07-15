@@ -1,16 +1,20 @@
-# 1단계: 스케줄 모드 비교
+# 01_schedule_mode_comparison.yaml
+
 program: sweeps/mraugment/train_entry.py
 method: grid
 metric:
-  name: val_ssim  # 최적화 목표 메트릭 (validation SSIM)
+  name: val_ssim
   goal: maximize
 parameters:
   config-name:
-    value: sweeping_default # 기본 설정 파일
-  
+    value: sweeping_default
+
   aug_schedule_mode:
     values: ['constant', 'epoch', 'val_loss']
-    
-  # 'epoch' 및 'val_loss' 모드일 때 사용할 스케줄 타입을 'exp'로 고정
+
   aug_schedule_type:
     value: 'exp'
+
+  # +++ 이 부분을 추가하여 maskDuplicate 기능을 비활성화합니다 +++
+  maskDuplicate:
+    value: none
