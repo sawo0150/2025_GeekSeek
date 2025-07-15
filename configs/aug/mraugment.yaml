@@ -2,14 +2,14 @@ _target_: utils.augmentations.mraugmenter.MRAugmenter
 
 # --- 공통 설정 ---
 aug_on: true
-aug_strength: 0.9           # 최대 증강 확률 (p_max)
+aug_strength: 0.9          # 최대 증강 확률 (p_max)
 aug_delay: 0             # 증강을 시작하기 전 대기할 에포크 수
 weight_dict:                # 각 증강 기법의 가중치
   fliph: 0.5
   flipv: 0.5
-  rotate: 1.0
-  scale: 1.0
-  shift: 1.0
+  rotate: 0.25
+  scale: 0.5
+  shift: 0.2
   shear: 0.5
 
 # --- 스케줄러 선택 ---
