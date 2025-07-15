@@ -320,11 +320,11 @@ def train(args):
 
     # ✨ Augmenter 객체 생성
     augmenter = None
-    print(getattr(args, "aug", None))
     if getattr(args, "aug", None):
         print("[Hydra] Augmenter를 생성합니다.")
         # args.aug에 mraugment.yaml에서 읽은 설정이 들어있습니다.
         augmenter = instantiate(args.aug)
+    print(getattr(args, "aug", None))
 
     # ① MaskAugmenter : 한 번만 생성
     mask_augmenter = None
@@ -335,6 +335,7 @@ def train(args):
         cfg_clean = OmegaConf.create({k: v for k, v in mask_aug_cfg.items()
                                     if k != "enable"})
         mask_augmenter = instantiate(cfg_clean)
+    print(getattr(args, "maskAugment", None))
 
     # ── Resume logic (이제 model, optimizer가 정의된 이후) ──
     start_epoch   = 0

@@ -5,7 +5,8 @@ from tqdm import tqdm  # 추가
 from collections import defaultdict
 from utils.common.utils import save_reconstructions
 from utils.data.load_data import create_data_loaders
-from utils.model.varnet import VarNet
+from hydra.utils import instantiate
+from omegaconf import OmegaConf
 
 def test(args, model, data_loader):
     model.eval()
@@ -42,9 +43,14 @@ def forward(args):
     torch.cuda.set_device(device)
     # print ('Current cuda device ', torch.cuda.current_device())
 
-    model = VarNet(num_cascades=args.cascade, 
-                   chans=args.chans, 
-                   sens_chans=args.sens_chans)
+    # model = VarNet(num_cascades=args.cascade, 
+    #                chans=args.chans, 
+    #                sens_chans=args.sens_chans)
+
+    # 모델 설정은 args.model dict (_target_ + 파라미터) 기준으로 instantiate
+    model_cfg = getattr(args, "model", {"_target_": "utils.model.varnet.VarNet"})
+    model = instantiate(OmegaConf.create(model_cfg),
+                        use_checkpoint=getattr(args, "training_checkpointing", False))
     model.to(device=device)
     
     checkpoint = torch.load(args.exp_dir / 'best_model.pt', map_location='cpu', weights_only=False)

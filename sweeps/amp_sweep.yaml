@@ -12,6 +12,6 @@ command:
   - ${env}
   - python
   - ${program}
-  # - "--config-name=sweeping_default"   # 기본 Hydra config
+  # - "--config-name=train_cluster_varnet_Ver2"   # 기본 Hydra config
   - "--config-name=train"
   - ${args}                            # ↑ parameters 가 여기로 풀림
