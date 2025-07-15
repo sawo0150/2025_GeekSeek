@@ -1,0 +1,19 @@
+# 3&4단계: ramp vs exp 비교
+program: sweeps/mraugment/train_entry.py
+method: grid
+metric:
+  name: val_ssim
+  goal: maximize
+parameters:
+  config-name:
+    value: sweeping_default
+    
+  aug_schedule_mode:
+    value: 'epoch' # 'epoch' 모드로 고정
+    
+  aug_schedule_type:
+    values: ['ramp', 'exp']
+    
+  # 'exp' 타입을 테스트할 때 사용할 decay 값 (2단계 최적값으로 설정)
+  aug_exp_decay:
+    value: 6.0 # 예시 값입니다. 2단계 실험에서 찾은 최적값으로 수정해주세요.

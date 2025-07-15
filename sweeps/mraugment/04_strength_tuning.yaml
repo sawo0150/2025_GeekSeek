@@ -1,0 +1,20 @@
+# 5단계: 전체 강도 튜닝
+program: sweeps/mraugment/train_entry.py
+method: bayes
+metric:
+  name: val_ssim
+  goal: maximize
+parameters:
+  config-name:
+    value: sweeping_default
+    
+  # 3,4 단계에서 찾은 최적의 설정으로 고정 (예: epoch, ramp)
+  aug_schedule_mode:
+    value: 'epoch'
+  aug_schedule_type:
+    value: 'ramp' 
+    
+  aug_strength:
+    distribution: uniform
+    min: 0.5
+    max: 1.0
