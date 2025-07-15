@@ -29,7 +29,6 @@ from utils.logging.metric_accumulator import MetricAccumulator
 from utils.logging.vis_logger import log_epoch_samples
 from utils.common.utils import save_reconstructions, ssim_loss, ssim_loss_gpu
 from utils.common.loss_function import SSIMLoss # train loss & metric loss
-from utils.model.varnet import VarNet
 from utils.logging.receptive_field import log_receptive_field
 
 
@@ -222,10 +221,16 @@ def train(args):
     print(f"[Hydra-eval] early_enabled={early_enabled}, stage_table={stage_table}")
 
 
-    model = VarNet(num_cascades=args.cascade,
-                   chans=args.chans,
-                   sens_chans=args.sens_chans,
-                   use_checkpoint=checkpointing).to(device)    # ← Hydra 플래그 연결)
+    # model = VarNet(num_cascades=args.cascade,
+    #                chans=args.chans,
+    #                sens_chans=args.sens_chans,
+    #                use_checkpoint=checkpointing).to(device)    # ← Hydra 플래그 연결)
+    # instantiate(cfg.model) 로 모든 모델 파라미터 주입,
+    # use_checkpoint 은 training.checkpointing 에 따름
+    model_cfg = getattr(args, "model", {"_target_": "utils.model.varnet.VarNet"})
+    model = instantiate(OmegaConf.create(model_cfg), use_checkpoint=checkpointing)
+    model.to(device)
+    print(f"[Hydra-model] model_cfg={model_cfg}")
 
     loss_cfg = getattr(args, "LossFunction", {"_target_": "utils.common.loss_function.SSIMLoss"})
     loss_type = instantiate(OmegaConf.create(loss_cfg)).to(device=device)
@@ -392,7 +397,7 @@ def train(args):
     for epoch in range(start_epoch, args.num_epochs):
         MetricLog_train = MetricAccumulator("train")
         MetricLog_val   = MetricAccumulator("val")
-        print(f'Epoch #{epoch:2d} ............... {args.net_name} ...............')
+        print(f'Epoch #{epoch:2d} ............... {args.exp_name} ...............')
 
         if augmenter is not None:
             last_val_loss = val_loss_history[-1] if val_loss_history else None
