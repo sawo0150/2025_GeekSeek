@@ -66,7 +66,7 @@ def train_epoch(args, epoch, model, data_loader, optimizer, scheduler,
         # 2) backward 에는 스칼라 평균을 사용
         loss = current_loss.mean() / accum_steps
 
-        print("max alloc MB:", torch.cuda.max_memory_allocated() / 1024**2)
+        # print("max alloc MB:", torch.cuda.max_memory_allocated() / 1024**2)
         # ─── Accumulation ──────────────────────────────────────────────
         if iter % accum_steps == 0:
             optimizer.zero_grad(set_to_none=True)
