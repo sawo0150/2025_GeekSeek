@@ -2,7 +2,7 @@ _target_: utils.augmentations.mraugmenter.MRAugmenter
 
 # --- 공통 설정 ---
 aug_on: true
-aug_strength: 0.9           # 최대 증강 확률 (p_max)
+aug_strength: 0.6           # 최대 증강 확률 (p_max)
 aug_delay: 5             # 증강을 시작하기 전 대기할 에포크 수
 weight_dict:                # 각 증강 기법의 가중치
   fliph: 0.5
