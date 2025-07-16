@@ -399,7 +399,7 @@ def train(args):
         MetricLog_train = MetricAccumulator("train")
         MetricLog_val   = MetricAccumulator("val")
         print(f'Epoch #{epoch:2d} ............... {args.exp_name} ...............')
-
+        torch.cuda.empty_cache()
         if augmenter is not None:
             last_val_loss = val_loss_history[-1] if val_loss_history else None
             augmenter.update_state(current_epoch=epoch, val_loss=last_val_loss)
