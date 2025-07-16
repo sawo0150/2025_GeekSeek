@@ -218,31 +218,32 @@ class MRAugmenter:
             
         return image_tensor
 
-    def _center_crop_and_pad(self, arr: np.ndarray, target_shape: Tuple[int,int]) -> np.ndarray:
-        """
-        2D numpy array arr를 target_shape (H0, W0)에 맞춰
-        중앙 크롭 후 패딩합니다.
-        """
-        H0, W0 = target_shape
-        h, w = arr.shape
-        # crop size
-        Hc, Wc = min(h, H0), min(w, W0)
-        top, left = (h - Hc)//2, (w - Wc)//2
-        cropped = arr[top:top+Hc, left:left+Wc]
+    # def _center_crop_and_pad(self, arr: np.ndarray, target_shape: Tuple[int,int]) -> np.ndarray:
+    #     """
+    #     2D numpy array arr를 target_shape (H0, W0)에 맞춰
+    #     중앙 크롭 후 패딩합니다.
+    #     """
+    #     H0, W0 = target_shape
+    #     h, w = arr.shape
+    #     # crop size
+    #     Hc, Wc = min(h, H0), min(w, W0)
+    #     top, left = (h - Hc)//2, (w - Wc)//2
+    #     cropped = arr[top:top+Hc, left:left+Wc]
 
-        pad_h = H0 - Hc
-        pad_w = W0 - Wc
-        if pad_h > 0 or pad_w > 0:
-            pad_top = pad_h//2
-            pad_bottom = pad_h - pad_top
-            pad_left = pad_w//2
-            pad_right = pad_w - pad_left
-            # constant padding with zeros
-            cropped = np.pad(cropped,
-                             ((pad_top, pad_bottom), (pad_left, pad_right)),
-                             mode='constant', constant_values=0)
-        return cropped
-    
+    #     pad_h = H0 - Hc
+    #     pad_w = W0 - Wc
+    #     if pad_h > 0 or pad_w > 0:
+    #         pad_top = pad_h//2
+    #         pad_bottom = pad_h - pad_top
+    #         pad_left = pad_w//2
+    #         pad_right = pad_w - pad_left
+    #         # constant padding with zeros
+    #         cropped = np.pad(cropped,
+    #                          ((pad_top, pad_bottom), (pad_left, pad_right)),
+    #                          mode='constant', constant_values=0)
+    #     return cropped
+
+
     def __call__(self, mask, kspace_np, target_np, attrs, fname, slice_idx):
         """
         데이터 로더의 transform 파이프라인의 일부로 동작합니다.
@@ -253,11 +254,11 @@ class MRAugmenter:
             # 증강이 비활성화된 경우, 원본 데이터를 그대로 반환
             return mask, kspace_np, target_np, attrs, fname, slice_idx
 
+        # ✨ 입력 kspace_np는 이미 ImageSpaceCropTransform에 의해 크롭된 상태
         kspace_slice = torch.from_numpy(kspace_np).cfloat()
 
         # k-space -> image 공간으로 변환
-        kspace_unshifted = torch.fft.ifftshift(kspace_slice, dim=(-2, -1))
-        image_domain = torch.fft.ifft2(kspace_unshifted, norm='ortho')
+        image_domain = torch.fft.ifft2(torch.fft.ifftshift(kspace_slice, dim=(-2, -1)), norm='ortho')
         image = torch.fft.fftshift(image_domain, dim=(-2, -1))
 
         # 증강 적용
@@ -267,9 +268,10 @@ class MRAugmenter:
         aug_kspace = self._fft(aug_image)
         aug_target = self._rss(aug_image)
 
-        # 원본 target_np shape에 맞춰 center-crop & pad 수행
-        final_target = self._center_crop_and_pad(aug_target.numpy(), target_np.shape)
+        # ✨ aug_target은 이미 크롭된 크기(H0, W0)를 가지므로 추가 크롭/패딩 불필요
+        # final_target = self._center_crop_and_pad(aug_target.numpy(), target_np.shape)
+        final_target = aug_target.numpy()
 
-
-        # 다음 transform(e.g., cropping)을 위해 numpy 배열로 변환하여 반환
-        return mask, aug_kspace.numpy(), final_target, attrs, fname, slice_idx
+        # 다음 transform을 위해 numpy 배열로 변환하여 반환
+        return mask, aug_kspace.numpy(), final_target, attrs, fname, slice_idx    
+    

@@ -1,50 +1,54 @@
-# train.yaml
+# configs/train.yaml
 
 defaults:
   - _self_
-  - model: varnet_small   # 모델 설정  varnet_sweep2
-  - data: local_sangwonDesktop         # 데이터 경로 설정
-  - LRscheduler: ExponentialLR        # ⬅️  추가 - https://gaussian37.github.io/dl-pytorch-lr_scheduler/참고
+  - model: varnet_sweep2
+  - data: local_gpu
+  - LRscheduler: ExponentialLR
   - LossFunction: SSIM+L1
-  - training: base          # base or vessl_vramMin
-  - early_stop: none    # 조기종료 기능 : early_stop or none
+  - training: vessl_vramMin
+  - early_stop: none
   - evaluation: leaderboard
-  - optimizer: nadam          # ⬅️ 새로 추가  
-  - aug: mraugment    # ⬅️ 새로 추가 none or mraugment
-  - centerCropPadding: crop_kspace # crop_zero or crop_noise or crop_kspace
-  - maskDuplicate: acc4_acc8       # acc4_acc8 or none
-  - maskAugment: universal             # universal or basic or none 
-  - collator: identity          # 또는 dynamicCompress or identity or identity_debug
-  - compressor: scc  # ⬅️ 새로 추가       # gcc, scc, none
-  - sampler: grouping          # 또는 grouping or identity
+  - optimizer: nadam
+  - aug: mraugment
+  # ✨ [삭제] centerCropPadding은 더 이상 사용되지 않음. use_crop 플래그로 대체됨
+  # - centerCropPadding: crop_kspace
+  - maskDuplicate: none
+  - maskAugment: none
+  # ✨ [수정] 코일 압축이 transform 단계에서 수행되므로 DynamicCompressCollator 불필요. IdentityCollator 사용.
+  - collator: identity
+  # ✨ [수정] compressor의 identity 옵션을 명시적으로 추가하여 비활성화 가능하게 함.
+  # scc, gcc, identity 중 선택
+  - compressor: gcc
+  - sampler: grouping
 
-# === Data Preprocessing === -  Mask → Crop → Compress → Tensor
-use_crop: false                  # spatial crop 사용 여부
-crop_size: [384, 384]           # crop 할 (H, W) - 무조건 짝수로 지정
-corner_size : 16
+# === Data Preprocessing ===
+# ✨ [수정] use_crop을 true로 설정하여 ImageSpaceCropTransform을 활성화합니다.
+use_crop: true
+crop_size: [384, 384] # crop 할 (H, W)
+corner_size: 16       # 노이즈 추정을 위한 이미지 코너 크기
 
 # === 공통 학습 하이퍼파라미터 ===
 GPU_NUM: 0
-batch_size: 2
-val_batch_size: 5     # 검증 배치 크기 (추가)
+batch_size: 60
+val_batch_size: 5
 num_epochs: 50
 lr: 1e-3
 report_interval: 500
 seed: 430
-num_workers: 4
+num_workers: 6
 
-exp_name : model_intantiate_eval_test
+exp_name: new_pipeline_test
 
 # these three are *required* by utils/data/load_data.py → create_data_loaders
-input_key:  kspace
+input_key: kspace
 target_key: image_label
-max_key:    max
+max_key: max
 
 wandb:
   project: fastmri-2025
-  entity: swpants05-seoul-national-university        # W&B 팀/계정
-  use_wandb: true           # false 이면 모든 wandb 로그 함수가 noop
-  max_vis_per_cat: 5        # epoch 마다 카테고리별 이미지 수 (0 → 안 올림)
-
+  entity: swpants05-seoul-national-university
+  use_wandb: true
+  max_vis_per_cat: 5
   use_visLogging: true
   use_receptiveField: false
