@@ -255,7 +255,7 @@ class MRAugmenter:
 
         kspace_slice = torch.from_numpy(kspace_np).cfloat()
 
-        # k-space -> image 공간으로 변환
+        # k-space -> image 공간으로 변환 (이 부분은 정상 동작)
         kspace_unshifted = torch.fft.ifftshift(kspace_slice, dim=(-2, -1))
         image_domain = torch.fft.ifft2(kspace_unshifted, norm='ortho')
         image = torch.fft.fftshift(image_domain, dim=(-2, -1))
@@ -263,13 +263,22 @@ class MRAugmenter:
         # 증강 적용
         aug_image = self._apply_transforms(image, p)
 
-        # 증강된 이미지로부터 새로운 k-space와 target 생성
-        aug_kspace = self._fft(aug_image)
+        # --- ✨ [수정된 부분] 증강된 이미지를 k-space로 변환 ---
+        # 1. 증강된 이미지를 푸리에 변환을 위해 unshift합니다.
+        aug_image_unshifted = torch.fft.ifftshift(aug_image, dim=(-2, -1))
+        
+        # 2. 푸리에 변환을 수행합니다. (k-space의 저주파수가 코너에 위치)
+        aug_kspace_uncentered = torch.fft.fft2(aug_image_unshifted, norm='ortho')
+
+        # 3. 저주파수 성분을 중앙으로 가져와 최종 k-space를 만듭니다.
+        aug_kspace = torch.fft.fftshift(aug_kspace_uncentered, dim=(-2, -1))
+        # --- 수정 완료 ---
+        
+        # 증강된 이미지로부터 새로운 target 생성 (이 부분은 기존과 동일)
         aug_target = self._rss(aug_image)
 
         # 원본 target_np shape에 맞춰 center-crop & pad 수행
         final_target = self._center_crop_and_pad(aug_target.numpy(), target_np.shape)
 
-
-        # 다음 transform(e.g., cropping)을 위해 numpy 배열로 변환하여 반환
+        # 다음 transform을 위해 numpy 배열로 변환하여 반환
         return mask, aug_kspace.numpy(), final_target, attrs, fname, slice_idx
