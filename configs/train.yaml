@@ -12,7 +12,7 @@ defaults:
   - optimizer: nadam          # ⬅️ 새로 추가  
   - aug: mraugment    # ⬅️ 새로 추가 none or mraugment
   - centerCropPadding: crop_kspace # crop_zero or crop_noise or crop_kspace
-  - maskDuplicate: acc4_acc8       # acc4_acc8 or none
+  - maskDuplicate: none       # acc4_acc8 or none
   - maskAugment: universal             # universal or basic or none 
   - collator: identity          # 또는 dynamicCompress or identity or identity_debug
   - compressor: scc  # ⬅️ 새로 추가       # gcc, scc, none
@@ -41,7 +41,7 @@ target_key: image_label
 max_key:    max
 
 wandb:
-  project: Vessel_fastmri-2025
+  project: vram_check
   entity: swpants05-seoul-national-university        # W&B 팀/계정
   use_wandb: true           # false 이면 모든 wandb 로그 함수가 noop
   max_vis_per_cat: 5        # epoch 마다 카테고리별 이미지 수 (0 → 안 올림)

@@ -14,6 +14,18 @@ try:
 except ModuleNotFoundError:
     wandb = None
 
+import os
+#---------------------------------------------------------#
+# 1. ❶ 메모리 단편화 완화용 CUDA allocator 옵션 ― 반드시
+#    torch import *이전*에 export 해야 효과가 납니다.  :contentReference[oaicite:0]{index=0}
+#---------------------------------------------------------#
+os.environ.setdefault(
+    "PYTORCH_CUDA_ALLOC_CONF",
+    "max_split_size_mb:64,garbage_collection_threshold:0.6"
+)
+
+import shutil
+
 from tqdm import tqdm
 from hydra.utils import instantiate          # ★ NEW
 from omegaconf import OmegaConf              # ★ NEW
@@ -32,12 +44,14 @@ from utils.common.loss_function import SSIMLoss # train loss & metric loss
 from utils.logging.receptive_field import log_receptive_field
 
 
-import os
 
 def train_epoch(args, epoch, model, data_loader, optimizer, scheduler,
                 loss_type, ssim_metric, metricLog_train,
                 scaler, amp_enabled, accum_steps):
     model.train()
+    # reset peak memory counter at the start of each epoch
+    torch.cuda.reset_peak_memory_stats()
+
     # start_epoch = start_iter = time.perf_counter()
     len_loader = len(data_loader)
     total_loss = 0.
@@ -81,8 +95,15 @@ def train_epoch(args, epoch, model, data_loader, optimizer, scheduler,
                 # unscale / clip_grad 등 필요 시 여기서
                 scaler.step(optimizer)
                 scaler.update()
+
+                optimizer.zero_grad(set_to_none=True)
+                torch.cuda.empty_cache()
             else:
                 optimizer.step()
+
+                # free gradient buffers right after the optimizer step
+                optimizer.zero_grad(set_to_none=True)
+                torch.cuda.empty_cache()
 
             if scheduler is not None:
                 # OneCycleLR·CyclicLR 등은 매 iteration 호출이 권장
@@ -108,6 +129,10 @@ def train_epoch(args, epoch, model, data_loader, optimizer, scheduler,
         # 여기서는 샘플별로 호출해서, 각 slice 로깅
         for lv, sv, cat in zip(loss_vals, ssim_vals, cats):
             metricLog_train.update(lv, sv, [cat])
+
+        # ---------- ❸ loop 끝 직후 불필요 텐서 ‧ list 즉시 해제 --------------------
+        del output, current_loss, loss, loss_vals, ssim_loss_vals
+        torch.cuda.empty_cache()
 
     # total_loss = total_loss / len_loader
     # return total_loss, time.perf_counter() - start_epoch
@@ -159,6 +184,10 @@ def validate(args, model, data_loader, acc_val, epoch, loss_type, ssim_metric):
                 ssim_i = 1 - ssim_loss_i
                 total_ssim += ssim_i
                 acc_val.update(loss_i, ssim_i, [cats[i]])
+
+        # free per-slice tensors to reduce cached memory
+        del out_slice, tgt_slice, loss_i, ssim_loss_i
+        torch.cuda.empty_cache()
 
     for fname in reconstructions:
         reconstructions[fname] = np.stack(
@@ -536,6 +565,9 @@ def train(args):
 
         # ────────── epoch 루프 내부, val 계산·로그 이후 ──────────
         current_epoch = epoch + 1         # 사람 눈금 1-base
+        # release dataloader workers & cached memory before next epoch
+        del train_loader
+        torch.cuda.empty_cache()
         if early_enabled and current_epoch in stage_table:
             req = stage_table[current_epoch]
             if val_ssim < req:

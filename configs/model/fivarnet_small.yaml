@@ -13,16 +13,16 @@ kspace_mult_factor: 1e6 # k-space 값을 학습 중 수치 안정화를 위해 �
 
 #(2,9,8)설정이 checkpointing 안할때 8420MB...
 
-# (1,9,8) : checkpointitn O : 6136
-# (1,9,8) : checkpointitn X : 6706
+# (1,9,8) : checkpointing O : 6136
+# (1,9,8) : checkpointing X : 6706
 
-# (2,9,8) : checkpointitn O : 6314
-# (2,9,8) : checkpointitn X : 8422
+# (2,9,8) : checkpointing O : 6314
+# (2,9,8) : checkpointing X : 8422
 
-# (3,9,8) : checkpointitn O : 6457
-# (3,9,8) : checkpointitn X : 10136
+# (3,9,8) : checkpointing O : 6457
+# (3,9,8) : checkpointing X : 10136
 
-# (4,9,8) : checkpointitn O : 6597
-# (5,9,8) : checkpointitn O : 6740
-# (6,9,8) : checkpointitn O : 6887
-# (10,9,8) : checkpointitn O : 7458
+# (4,9,8) : checkpointing O : 6597
+# (5,9,8) : checkpointing O : 6740
+# (6,9,8) : checkpointing O : 6887
+# (10,9,8) : checkpointing O : 7458
