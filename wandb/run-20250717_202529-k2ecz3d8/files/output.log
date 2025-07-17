@@ -1,0 +1,45 @@
+Current cuda device:  0
+[Hydra-visLogging]  True
+[Hydra-receptiveField]  False
+[Hydra-maskDuplicate] {'enable': True, '_target_': 'utils.data.duplicate_dataset.DuplicateMaskDataset', 'accel_cfgs': [{'accel': 4}, {'accel': 8}], 'bundle_path': '/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek//metaData/precomputed_masks.npz'}
+[Hydra-eval] {'enable': False, 'stages': [{'epoch': 10, 'ssim': 0.9}, {'epoch': 20, 'ssim': 0.95}, {'epoch': 25, 'ssim': 0.96}]}
+[Hydra-eval] early_enabled=False, stage_table={10: 0.9, 20: 0.95, 25: 0.96}
+[Hydra-model] model_cfg={'_target_': 'utils.model.varnet.VarNet', 'num_cascades': 18, 'chans': 18, 'sens_chans': 8}
+[Hydra] loss_func ▶ SSIML1Loss(
+  (ssim_base): SSIMLoss()
+)
+[Hydra] Optimizer ▶ NAdam
+Traceback (most recent call last):
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/hydra/_internal/instantiate/_instantiate2.py", line 92, in _call_target
+    return _target_(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/data/sampler.py", line 48, in __init__
+    for idx, shape in enumerate(sample_shapes):
+                      ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: 'NoneType' object is not iterable
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/domain_train.py", line 125, in <module>
+    main()
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/domain_train.py", line 119, in main
+    run_block(cfg, start_ep, end_ep, args.wandb_project)
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/domain_train.py", line 65, in run_block
+    train(args_ns)
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/learning/train_part.py", line 310, in train
+    temp_loader = create_data_loaders(
+                  ^^^^^^^^^^^^^^^^^^^^
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/data/load_data.py", line 194, in create_data_loaders
+    sampler = instantiate(
+              ^^^^^^^^^^^^
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/hydra/_internal/instantiate/_instantiate2.py", line 226, in instantiate
+    return instantiate_node(
+           ^^^^^^^^^^^^^^^^^
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/hydra/_internal/instantiate/_instantiate2.py", line 347, in instantiate_node
+    return _call_target(_target_, partial, args, kwargs, full_key)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/hydra/_internal/instantiate/_instantiate2.py", line 97, in _call_target
+    raise InstantiationException(msg) from e
+hydra.errors.InstantiationException: Error in call to target 'utils.data.sampler.GroupByCoilBatchSampler':
+TypeError("'NoneType' object is not iterable")

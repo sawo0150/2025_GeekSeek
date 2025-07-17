@@ -313,7 +313,8 @@ def train(args):
         shuffle=True,
         augmenter=None,            # 길이만 알면 되므로 Augment 미적용
         mask_augmenter=None,
-        is_train=True
+        is_train=True,
+        domain_filter=getattr(args, "domain_filter", None)
     )
     effective_steps = math.ceil(len(temp_loader) / accum_steps)
     del temp_loader                # 메모리 바로 반환
@@ -346,6 +347,7 @@ def train(args):
                 augmenter=None,
                 mask_augmenter=None,
                 is_train=True,      # ★ train만 True
+                domain_filter=getattr(args, "domain_filter", None),
             )
             effective_steps = math.ceil(len(temp_loader) / accum_steps)
             del temp_loader
@@ -472,6 +474,7 @@ def train(args):
                                      augmenter=None,
                                      mask_augmenter=None,
                                      is_train=False,     # ★ val/test는 False)
+                                     domain_filter=getattr(args, "domain_filter", None),
     )
     
     val_loss_log = np.empty((0, 2))
@@ -495,7 +498,8 @@ def train(args):
             shuffle=True, 
             augmenter=augmenter, # 업데이트된 augmenter 전달
             mask_augmenter=mask_augmenter,
-            is_train=True      # ★ train만 True
+            is_train=True,      # ★ train만 True
+            domain_filter=getattr(args, "domain_filter", None),
         )
 
         train_loss, train_time = train_epoch(args, epoch, model,

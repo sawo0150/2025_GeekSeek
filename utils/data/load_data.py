@@ -113,7 +113,8 @@ class SliceData(Dataset):
 
 
 def create_data_loaders(data_path, args, shuffle=False, isforward=False, 
-                        augmenter=None, mask_augmenter=None, is_train=False):
+                        augmenter=None, mask_augmenter=None, is_train=False,
+                        domain_filter=None):
     if isforward == False:
         max_key_ = args.max_key
         target_key_ = args.target_key
@@ -151,6 +152,11 @@ def create_data_loaders(data_path, args, shuffle=False, isforward=False,
         root=data_path, transform=lambda *x: x,
         input_key=args.input_key, target_key=target_key_, forward=isforward
     )
+    
+    # ───── 도메인(cat) 필터링 ───────────────────────────────────────────
+    if domain_filter:
+        from utils.data.domain_subset import DomainSubset
+        raw_ds = DomainSubset(raw_ds, domain_filter)
 
     # 2)  *** Duplicate 적용 (crop 前) ***
     dup_cfg = getattr(args,"maskDuplicate",{"enable":False})

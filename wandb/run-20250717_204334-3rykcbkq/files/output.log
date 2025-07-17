@@ -1,0 +1,57 @@
+Current cuda device:  0
+[Hydra-visLogging]  True
+[Hydra-receptiveField]  False
+[Hydra-maskDuplicate] {'enable': True, '_target_': 'utils.data.duplicate_dataset.DuplicateMaskDataset', 'accel_cfgs': [{'accel': 4}, {'accel': 8}], 'bundle_path': '/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek//metaData/precomputed_masks.npz'}
+[Hydra-eval] {'enable': False, 'stages': [{'epoch': 10, 'ssim': 0.9}, {'epoch': 20, 'ssim': 0.95}, {'epoch': 25, 'ssim': 0.96}]}
+[Hydra-eval] early_enabled=False, stage_table={10: 0.9, 20: 0.95, 25: 0.96}
+[Hydra-model] model_cfg={'_target_': 'utils.model.varnet.VarNet', 'num_cascades': 1, 'chans': 9, 'sens_chans': 4}
+[Hydra] loss_func ▶ SSIML1Loss(
+  (ssim_base): SSIMLoss()
+)
+[Hydra] Optimizer ▶ NAdam
+[Hydra] Scheduler ▶ <torch.optim.lr_scheduler.ExponentialLR object at 0x7d9534d02c90>
+[DeepSpeed] use_deepspeed False
+{'enable': False, 'config': {'train_micro_batch_size_per_gpu': 4, 'dist_init_required': False, 'optimizer': {'type': 'Adam', 'params': {'lr': 0.001, 'betas': [0.9, 0.999], 'eps': 1e-08, 'weight_decay': 0}}, 'zero_optimization': {'stage': 1, 'offload_optimizer': {'device': 'cpu'}}, 'fp16': {'enabled': False}, 'scheduler': {'type': 'WarmupCosineLR', 'params': {'warmup_min_ratio': 0.001, 'cos_min_ratio': 0.1, 'warmup_num_steps': 1686, 'total_num_steps': 2810}}}}
+[Hydra] Augmenter를 생성합니다.
+{'_target_': 'utils.augmentations.mraugmenter.MRAugmenter', 'aug_on': True, 'aug_strength': 0.6, 'aug_delay': 5, 'weight_dict': {'fliph': 0.5, 'flipv': 0.5, 'rotate': 0.25, 'scale': 0.5, 'shift': 0.2, 'shear': 0.5}, 'aug_schedule_mode': 'epoch', 'aug_schedule_type': 'ramp', 'max_epochs': 5, 'val_loss_window_size': 5, 'val_loss_grad_start': -0.05, 'val_loss_grad_plateau': -0.001, 'aug_exp_decay': 6.0, 'max_rotation_angle': 15.0, 'scale_range': [0.85, 1.15], 'shift_extent': 5.0, 'max_shear_angle': 10.0}
+[Hydra] mask_augmenter :  True
+{'enable': True, '_target_': 'utils.augmentations.maskaugmenter.MaskAugmenter', 'aug_on': True, 'aug_strength': 0.6, 'aug_delay': 5, 'aug_schedule_mode': 'epoch', 'aug_schedule_type': 'ramp', 'max_epochs': 5, 'val_loss_window_size': 5, 'val_loss_grad_start': -0.05, 'val_loss_grad_plateau': -0.001, 'aug_exp_decay': 6.0, 'mask_specs': {'equispaced': {'prob': 0.4, 'accel': [4, 8], 'cf': [0.07, 0.1]}, 'equispaced_fraction': {'prob': 0.3, 'accel': [4, 8], 'cf': [0.07, 0.1]}, 'random': {'prob': 0.2, 'accel': [4, 8], 'cf': [0.07, 0.1]}, 'magic_fraction': {'prob': 0.1, 'accel': [4, 8], 'cf': [0.07, 0.1]}}, 'allow_any_combination': True}
+/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/learning/train_part.py:453: FutureWarning: `torch.cuda.amp.GradScaler(args...)` is deprecated. Please use `torch.amp.GradScaler('cuda', args...)` instead.
+  scaler = GradScaler(enabled=amp_enabled)
+/home/swpants05/Desktop/2025_FastMri/Data/train
+/home/swpants05/Desktop/2025_FastMri/Data/val
+[Hydra-eval] {'enable': False, 'every_n_epochs': 1, 'batch_size': 5, 'leaderboard_root': '/home/swpants05/Desktop/2025_FastMri/Data/leaderboard/', 'output_key': 'reconstruction'}
+[Hydra-eval] lb_enable=False, lb_every=1
+Epoch # 0 ............... domain0_knee_x4_knee_x8 ...............
+Epoch[ 0/5]/:   0%|                          | 0/1124 [00:00<?, ?it/s]/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/learning/train_part.py:74: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with autocast(enabled=amp_enabled):
+/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/model/varnet.py:302: UserWarning: where received a uint8 condition tensor. This behavior is deprecated and will be removed in a future version of PyTorch. Use a boolean condition instead. (Triggered internally at /pytorch/aten/src/ATen/native/TensorCompare.cpp:611.)
+  soft_dc = torch.where(mask, current_kspace - ref_kspace, zero) * self.dc_weight
+[34m[1mwandb[0m: [33mWARNING[0m Saving files without folders. If you want to preserve subdirectories pass base_path to wandb.save, i.e. wandb.save("/mnt/folder/file.h5", base_path="/mnt")
+loss file saved! /home/swpants05/Desktop/2025_FastMri/result/domain0_knee_x4_knee_x8/val_loss_log
+visual Logging...
+Epoch = [   0/   5] TrainLoss = 0.08841 ValLoss = 0.07608 ValSSIM = 0.9309 TrainTime = 650.1794s ValTime = 20.0776s
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@NewRecord@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+ForwardTime = 0.4013s
+Epoch # 1 ............... domain0_knee_x4_knee_x8 ...............
+Epoch[ 1/5]/:   0%|                          | 0/1124 [00:00<?, ?it/s]/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/learning/train_part.py:74: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with autocast(enabled=amp_enabled):
+Epoch[ 4/5]/:  45%|▉ | 509/1124 [04:52<05:51,  1.75it/s, loss=0.08385]
+loss file saved! /home/swpants05/Desktop/2025_FastMri/result/domain0_knee_x4_knee_x8/val_loss_log
+visual Logging...
+Epoch = [   1/   5] TrainLoss = 0.07803 ValLoss = 0.07194 ValSSIM = 0.9348 TrainTime = 647.0369s ValTime = 19.8995s
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@NewRecord@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+ForwardTime = 0.3892s
+Epoch # 2 ............... domain0_knee_x4_knee_x8 ...............
+loss file saved! /home/swpants05/Desktop/2025_FastMri/result/domain0_knee_x4_knee_x8/val_loss_log
+visual Logging...
+Epoch = [   2/   5] TrainLoss = 0.0747 ValLoss = 0.06857 ValSSIM = 0.9377 TrainTime = 647.2570s ValTime = 20.4923s
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@NewRecord@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+ForwardTime = 0.4384s
+Epoch # 3 ............... domain0_knee_x4_knee_x8 ...............
+loss file saved! /home/swpants05/Desktop/2025_FastMri/result/domain0_knee_x4_knee_x8/val_loss_log
+visual Logging...
+Epoch = [   3/   5] TrainLoss = 0.07284 ValLoss = 0.06742 ValSSIM = 0.9388 TrainTime = 649.6935s ValTime = 20.3550s
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@NewRecord@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+ForwardTime = 0.5373s
+Epoch # 4 ............... domain0_knee_x4_knee_x8 ...............

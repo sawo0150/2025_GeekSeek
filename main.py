@@ -81,6 +81,10 @@ def _flatten_cfg_to_args(cfg: DictConfig) -> SimpleNamespace:
     for p in [args.exp_dir, args.val_dir]:
         p.mkdir(parents=True, exist_ok=True)
 
+    # ─ domain_filter(옵션) 전달
+    if "data" in cfg and "domain_filter" in cfg["data"]:
+        args.domain_filter = cfg.data.domain_filter
+
     return args
 
 @hydra.main(config_path="configs", config_name="train", version_base=None)

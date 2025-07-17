@@ -1,0 +1,186 @@
+Current cuda device:  0
+[Hydra-visLogging]  True
+[Hydra-receptiveField]  False
+[Hydra-maskDuplicate] {'enable': False}
+[Hydra-eval] {'enable': False, 'stages': [{'epoch': 10, 'ssim': 0.9}, {'epoch': 20, 'ssim': 0.95}, {'epoch': 25, 'ssim': 0.96}]}
+[Hydra-eval] early_enabled=False, stage_table={10: 0.9, 20: 0.95, 25: 0.96}
+[Hydra-model] model_cfg={'_target_': 'utils.model.varnet.VarNet', 'num_cascades': 18, 'chans': 18, 'sens_chans': 8}
+[Hydra] loss_func ▶ SSIML1Loss(
+  (ssim_base): SSIMLoss()
+)
+[Hydra] Optimizer ▶ NAdam
+[Hydra] Scheduler ▶ <torch.optim.lr_scheduler.ExponentialLR object at 0x7f163bcf3b50>
+[DeepSpeed] use_deepspeed False
+{'enable': False, 'config': {'train_micro_batch_size_per_gpu': 1, 'dist_init_required': False, 'optimizer': {'type': 'Adam', 'params': {'lr': 0.001, 'betas': [0.9, 0.999], 'eps': 1e-08, 'weight_decay': 0}}, 'zero_optimization': {'stage': 1, 'offload_optimizer': {'device': 'cpu'}}, 'fp16': {'enabled': False}, 'scheduler': {'type': 'WarmupCosineLR', 'params': {'warmup_min_ratio': 0.001, 'cos_min_ratio': 0.1, 'warmup_num_steps': 7407, 'total_num_steps': 123450}}}}
+[Hydra] Augmenter를 생성합니다.
+{'_target_': 'utils.augmentations.mraugmenter.MRAugmenter', 'aug_on': True, 'aug_strength': 0.6, 'aug_delay': 5, 'weight_dict': {'fliph': 0.5, 'flipv': 0.5, 'rotate': 0.25, 'scale': 0.5, 'shift': 0.2, 'shear': 0.5}, 'aug_schedule_mode': 'epoch', 'aug_schedule_type': 'ramp', 'max_epochs': 50, 'val_loss_window_size': 5, 'val_loss_grad_start': -0.05, 'val_loss_grad_plateau': -0.001, 'aug_exp_decay': 6.0, 'max_rotation_angle': 15.0, 'scale_range': [0.85, 1.15], 'shift_extent': 5.0, 'max_shear_angle': 10.0}
+[Hydra] mask_augmenter :  True
+{'enable': True, '_target_': 'utils.augmentations.maskaugmenter.MaskAugmenter', 'aug_on': True, 'aug_strength': 0.6, 'aug_delay': 5, 'aug_schedule_mode': 'epoch', 'aug_schedule_type': 'ramp', 'max_epochs': 50, 'val_loss_window_size': 5, 'val_loss_grad_start': -0.05, 'val_loss_grad_plateau': -0.001, 'aug_exp_decay': 6.0, 'mask_specs': {'equispaced': {'prob': 0.4, 'accel': [4, 8], 'cf': [0.07, 0.1]}, 'equispaced_fraction': {'prob': 0.3, 'accel': [4, 8], 'cf': [0.07, 0.1]}, 'random': {'prob': 0.2, 'accel': [4, 8], 'cf': [0.07, 0.1]}, 'magic_fraction': {'prob': 0.1, 'accel': [4, 8], 'cf': [0.07, 0.1]}}, 'allow_any_combination': True}
+/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/learning/train_part.py:453: FutureWarning: `torch.cuda.amp.GradScaler(args...)` is deprecated. Please use `torch.amp.GradScaler('cuda', args...)` instead.
+  scaler = GradScaler(enabled=amp_enabled)
+/home/swpants05/Desktop/2025_FastMri/Data/train
+/home/swpants05/Desktop/2025_FastMri/Data/val
+[Hydra-eval] {'enable': True, 'every_n_epochs': 1, 'batch_size': 5, 'leaderboard_root': '/home/swpants05/Desktop/2025_FastMri/Data/leaderboard/', 'output_key': 'reconstruction'}
+[Hydra-eval] lb_enable=True, lb_every=1
+Epoch # 0 ............... fi_varnet_Test ...............
+Epoch[ 0/50]/:   0%|                         | 0/4937 [00:00<?, ?it/s]/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/learning/train_part.py:74: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with autocast(enabled=amp_enabled):
+/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/model/varnet.py:302: UserWarning: where received a uint8 condition tensor. This behavior is deprecated and will be removed in a future version of PyTorch. Use a boolean condition instead. (Triggered internally at /pytorch/aten/src/ATen/native/TensorCompare.cpp:611.)
+  soft_dc = torch.where(mask, current_kspace - ref_kspace, zero) * self.dc_weight
+max alloc MB: 2306.70556640625
+max memory_reserved MB: 2774.0
+Epoch[ 0/50]/:   0%| | 16/4937 [00:13<1:12:24,  1.13it/s, loss=0.07813
+max alloc MB: 2548.11181640625
+max memory_reserved MB: 3766.0
+max alloc MB: 2725.5849609375
+max memory_reserved MB: 4052.0
+max alloc MB: 2796.9541015625
+max memory_reserved MB: 4052.0
+max alloc MB: 2971.318359375
+max memory_reserved MB: 4180.0
+max alloc MB: 2971.318359375
+max memory_reserved MB: 4180.0
+max alloc MB: 3058.56005859375
+max memory_reserved MB: 4310.0
+max alloc MB: 3540.90185546875
+max memory_reserved MB: 4310.0
+max alloc MB: 3861.990234375
+max memory_reserved MB: 5532.0
+max alloc MB: 3861.990234375
+max memory_reserved MB: 5532.0
+max alloc MB: 3861.990234375
+max memory_reserved MB: 5532.0
+max alloc MB: 4194.5146484375
+max memory_reserved MB: 5532.0
+max alloc MB: 4546.39404296875
+max memory_reserved MB: 6678.0
+max alloc MB: 4546.39404296875
+max memory_reserved MB: 6678.0
+max alloc MB: 4548.974609375
+max memory_reserved MB: 6678.0
+max alloc MB: 4548.974609375
+max memory_reserved MB: 6678.0
+max alloc MB: 4548.974609375
+max memory_reserved MB: 6678.0
+max alloc MB: 4548.974609375
+max memory_reserved MB: 6678.0
+max alloc MB: 4548.974609375
+max memory_reserved MB: 6678.0
+max alloc MB: 4548.974609375
+max memory_reserved MB: 6678.0
+max alloc MB: 4548.974609375
+max memory_reserved MB: 6678.0
+max alloc MB: 4548.974609375
+max memory_reserved MB: 6678.0
+max alloc MB: 4548.974609375
+max memory_reserved MB: 6678.0
+max alloc MB: 4548.974609375
+max memory_reserved MB: 6678.0
+max alloc MB: 4548.974609375
+max memory_reserved MB: 6678.0
+max alloc MB: 4548.974609375
+max memory_reserved MB: 6678.0
+max alloc MB: 4548.974609375
+max memory_reserved MB: 6678.0
+max alloc MB: 4548.974609375
+max memory_reserved MB: 6678.0
+max alloc MB: 4548.974609375
+max memory_reserved MB: 6678.0
+max alloc MB: 4548.974609375
+max memory_reserved MB: 6678.0
+max alloc MB: 4548.974609375
+max memory_reserved MB: 6678.0
+max alloc MB: 4548.974609375
+max memory_reserved MB: 6678.0
+max alloc MB: 4548.974609375
+max memory_reserved MB: 6678.0
+max alloc MB: 4548.974609375
+max memory_reserved MB: 6678.0
+max alloc MB: 4548.974609375
+max memory_reserved MB: 6678.0
+max alloc MB: 4548.974609375
+max memory_reserved MB: 6678.0
+max alloc MB: 4548.974609375
+max memory_reserved MB: 6678.0
+max alloc MB: 4548.974609375
+max memory_reserved MB: 6678.0
+max alloc MB: 4548.974609375
+max memory_reserved MB: 6720.0
+max alloc MB: 4548.974609375
+max memory_reserved MB: 6720.0
+max alloc MB: 4548.974609375
+max memory_reserved MB: 6720.0
+max alloc MB: 4548.974609375
+max memory_reserved MB: 6720.0
+max alloc MB: 4548.974609375
+max memory_reserved MB: 6720.0
+max alloc MB: 4548.974609375
+max memory_reserved MB: 6720.0
+max alloc MB: 4548.974609375
+max memory_reserved MB: 6720.0
+max alloc MB: 4548.974609375
+max memory_reserved MB: 6720.0
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/main.py", line 118, in <module>
+    main()
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/hydra/main.py", line 94, in decorated_main
+    _run_hydra(
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/hydra/_internal/utils.py", line 394, in _run_hydra
+    _run_app(
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/hydra/_internal/utils.py", line 457, in _run_app
+    run_and_report(
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/hydra/_internal/utils.py", line 220, in run_and_report
+    return func()
+           ^^^^^^
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/hydra/_internal/utils.py", line 458, in <lambda>
+    lambda: hydra.run(
+            ^^^^^^^^^^
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/hydra/_internal/hydra.py", line 119, in run
+    ret = run_job(
+          ^^^^^^^^
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/hydra/core/utils.py", line 186, in run_job
+    ret.return_value = task_function(task_cfg)
+                       ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/main.py", line 111, in main
+    train(args)   # utils.learning.train_part.train 호출 :contentReference[oaicite:2]{index=2}
+    ^^^^^^^^^^^
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/learning/train_part.py", line 505, in train
+    train_loss, train_time = train_epoch(args, epoch, model,
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/learning/train_part.py", line 75, in train_epoch
+    output = model(kspace, mask)
+             ^^^^^^^^^^^^^^^^^^^
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1751, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1762, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/model/varnet.py", line 250, in forward
+    kspace_pred = checkpoint(
+                  ^^^^^^^^^^^
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/torch/_compile.py", line 51, in inner
+    return disable_fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/torch/_dynamo/eval_frame.py", line 838, in _fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/torch/utils/checkpoint.py", line 494, in checkpoint
+    next(gen)
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/torch/utils/checkpoint.py", line 1497, in _checkpoint_without_reentrant_generator
+    fwd_devices, fwd_device_states = get_device_states(*args)
+                                     ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/torch/utils/checkpoint.py", line 177, in get_device_states
+    device_module = _get_device_module(_infer_device_type(*args))
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/torch/utils/checkpoint.py", line 138, in _infer_device_type
+    tree_map(add_device_types, args)
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/torch/utils/_pytree.py", line 1145, in tree_map
+    return treespec.unflatten(map(func, *flat_args))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/torch/utils/_pytree.py", line 989, in unflatten
+    if self.is_leaf():
+       ^^^^^^^^^^^^^^
+  File "/home/swpants05/.pyenv/versions/3.11.4/lib/python3.11/site-packages/torch/utils/_pytree.py", line 894, in is_leaf
+    def is_leaf(self) -> bool:
+
+KeyboardInterrupt
