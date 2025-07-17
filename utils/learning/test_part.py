@@ -61,3 +61,6 @@ def forward(args):
     forward_loader = create_data_loaders(data_path = args.data_path, args = args, isforward = True)
     reconstructions, inputs = test(args, model, forward_loader)
     save_reconstructions(reconstructions, args.forward_dir, inputs=inputs)
+
+    del forward_loader
+    torch.cuda.empty_cache()

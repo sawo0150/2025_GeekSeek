@@ -6,7 +6,7 @@ defaults:
   - data: local_sangwonDesktop         # 데이터 경로 설정
   - LRscheduler: ExponentialLR        # ⬅️  추가 - https://gaussian37.github.io/dl-pytorch-lr_scheduler/참고
   - LossFunction: SSIM+L1
-  - training: base          # base or vessl_vramMin
+  - training: base_sw          # base or vessl_vramMin or base_sw
   - early_stop: none    # 조기종료 기능 : early_stop or none
   - evaluation: leaderboard
   - optimizer: nadam          # ⬅️ 새로 추가  
@@ -28,6 +28,7 @@ GPU_NUM: 0
 batch_size: 1
 val_batch_size: 5     # 검증 배치 크기 (추가)
 num_epochs: 50
+warmup_epochs : 3
 lr: 1e-3
 report_interval: 500
 seed: 430
