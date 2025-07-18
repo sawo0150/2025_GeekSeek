@@ -18,7 +18,7 @@ chans: 32
 pools: 3 # 1, 2, 4 scales
 
 # Swin Transformer 블록의 헤드 수
-num_heads: 6
+num_heads: 8
 
 # Swin Transformer의 윈도우 크기
 window_size: 6

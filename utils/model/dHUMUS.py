@@ -5,55 +5,58 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.checkpoint import checkpoint
 import fastmri
-from fastmri.data import transforms
 from einops import rearrange
+
+# ❌ fastmri.data.transforms는 더 이상 직접 사용하지 않습니다.
+# from fastmri.data import transforms
 
 from utils.model.varnet import SensitivityModel
 from utils.common.loss_function import SSIMLoss
 
-# ✅ [FINAL FIX] 어떤 크기의 입력에도 대응할 수 있는 crop 또는 pad 함수
+# ✅ [최종 솔루션] 어떤 크기의 입력에도 대응할 수 있는 crop 또는 pad 함수
 def center_crop_or_pad(data: torch.Tensor, shape: tuple[int, int]):
     """
     Applies a center crop or zero pad to obtain shape.
     Args:
-        data: The input tensor to be cropped or padded.
-        shape: The desired output shape.
+        data: The input tensor to be cropped or padded of shape [B, H, W].
+        shape: The desired output shape (H, W).
     """
     if not (0 < shape[0] and 0 < shape[1]):
         raise ValueError("Invalid output shape.")
 
-    # Get original shape
     h, w = data.shape[-2:]
-
-    # Get desired shape
     target_h, target_w = shape
 
-    # Pad or crop height
-    if h < target_h:
-        h_pad_top = (target_h - h) // 2
-        h_pad_bottom = target_h - h - h_pad_top
-        pad_h = (h_pad_top, h_pad_bottom)
+    # Crop or pad height
+    if h > target_h:
+        h_start = (h - target_h) // 2
+        h_end = h_start + target_h
     else:
-        h_crop_start = (h - target_h) // 2
-        data = data[..., h_crop_start:h_crop_start + target_h, :]
-        pad_h = (0, 0)
+        h_start = 0
+        h_end = h
 
-    # Pad or crop width
-    if w < target_w:
-        w_pad_left = (target_w - w) // 2
-        w_pad_right = target_w - w - w_pad_left
-        pad_w = (w_pad_left, w_pad_right)
+    # Crop or pad width
+    if w > target_w:
+        w_start = (w - target_w) // 2
+        w_end = w_start + target_w
     else:
-        w_crop_start = (w - target_w) // 2
-        data = data[..., w_crop_start:w_crop_start + target_w]
-        pad_w = (0, 0)
+        w_start = 0
+        w_end = w
         
-    # Apply padding
-    padding = pad_w + pad_h
-    if any(p > 0 for p in padding):
-        data = F.pad(data, padding, "constant", 0)
+    cropped_data = data[..., h_start:h_end, w_start:w_end]
 
-    return data
+    # Pad if necessary
+    pad_h_top = (target_h - cropped_data.shape[-2]) // 2
+    pad_h_bottom = target_h - cropped_data.shape[-2] - pad_h_top
+    pad_w_left = (target_w - cropped_data.shape[-1]) // 2
+    pad_w_right = target_w - cropped_data.shape[-1] - pad_w_left
+    
+    padding = (pad_w_left, pad_w_right, pad_h_top, pad_h_bottom)
+    
+    if any(p > 0 for p in padding):
+        return F.pad(cropped_data, padding, "constant", 0)
+    else:
+        return cropped_data
 
 
 # --- Helper Modules ---
@@ -102,8 +105,7 @@ class SwinTransformerBlock(nn.Module):
         B, L, C = x.shape
         shortcut = x
         x = self.norm1(x).view(B, H, W, C)
-        pad_h = (self.window_size - H % self.window_size) % self.window_size
-        pad_w = (self.window_size - W % self.window_size) % self.window_size
+        pad_h, pad_w = (self.window_size - H % self.window_size) % self.window_size, (self.window_size - W % self.window_size) % self.window_size
         if pad_h > 0 or pad_w > 0: x = F.pad(x, (0, 0, 0, pad_w, 0, pad_h))
         _, H_pad, W_pad, _ = x.shape
         if shift_size > 0: x = torch.roll(x, shifts=(-shift_size, -shift_size), dims=(1, 2))
@@ -213,7 +215,7 @@ class dHUMUSNet(nn.Module):
         rnn_hidden_size: int, sens_chans: int, sens_pools: int, use_checkpoint: bool,
     ):
         super().__init__()
-        print("\n--- Initializing dHUMUS-Net (Final Patched v7 - Stable) ---")
+        print("\n--- Initializing dHUMUS-Net (Final Stable Version) ---")
         self.use_checkpoint, self.num_cascades = use_checkpoint, num_cascades
         self.sens_net = SensitivityModel(sens_chans, sens_pools)
         self.ospn = OSPN(pu_factors, rnn_hidden_size, scale_options)
