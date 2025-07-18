@@ -426,6 +426,7 @@ def train(args):
     best_val_ssim = 0.0
     val_loss_history = [] # val loss기록 for augmenter
 
+    print(f"[Resume] {getattr(args, 'resume_checkpoint', None)}")
     if getattr(args, 'resume_checkpoint', None):
         ckpt = torch.load(args.resume_checkpoint, map_location=device, weights_only=False)
         model.load_state_dict(ckpt['model'])

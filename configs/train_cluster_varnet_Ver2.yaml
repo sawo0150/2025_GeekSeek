@@ -31,7 +31,7 @@ num_epochs: 50
 lr: 1e-3
 report_interval: 500
 seed: 430
-num_workers: 10
+num_workers: 4
 
 exp_name : varnet_SOTA_ver2
 
