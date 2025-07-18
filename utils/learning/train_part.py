@@ -38,7 +38,6 @@ def train_epoch(args, epoch, model, data_loader, optimizer, scheduler,
                 loss_type, ssim_metric, metricLog_train,
                 scaler, amp_enabled, accum_steps):
     model.train()
-    # start_epoch = start_iter = time.perf_counter()
     len_loader = len(data_loader)
     total_loss = 0.
     total_slices = 0
@@ -55,15 +54,19 @@ def train_epoch(args, epoch, model, data_loader, optimizer, scheduler,
         mask = mask.cuda(non_blocking=True)
         kspace = kspace.cuda(non_blocking=True)
         target = target.cuda(non_blocking=True)
-        maximum = maximum.cuda(non_blocking=True) # 슬라이스 max가 아니라 볼륨 전체 max임... (한 환자에 대해서..)
+        maximum = maximum.cuda(non_blocking=True)
 
         with autocast(enabled=amp_enabled):
             output = model(kspace, mask)
+
+        # ✅ [VRAM 로깅 추가] report_interval 마다 VRAM 사용량 출력
+        if iter > 0 and iter % args.report_interval == 0:
+            torch.cuda.synchronize() # 정확한 측정을 위한 동기화
+            vram_alloc = torch.cuda.memory_allocated() / 1024**2
+            vram_peak = torch.cuda.max_memory_allocated() / 1024**2
+            print(f"\n  [VRAM at iter {iter}] Allocated: {vram_alloc:.2f} MB | Peak: {vram_peak:.2f} MB")
             
-        # pass cats list so MaskedLoss can pick per-cat thresholds
-        # 1) per-sample loss 텐서 [B]
         current_loss = loss_type(output, target, maximum, cats)
-        # 2) backward 에는 스칼라 평균을 사용
         loss = current_loss.mean() / accum_steps
 
         print("max alloc MB:", torch.cuda.max_memory_allocated() / 1024**2)
