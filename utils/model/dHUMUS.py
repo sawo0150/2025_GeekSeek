@@ -7,73 +7,42 @@ from torch.utils.checkpoint import checkpoint
 import fastmri
 from einops import rearrange
 
-# ❌ fastmri.data.transforms는 더 이상 직접 사용하지 않습니다.
-# from fastmri.data import transforms
-
 from utils.model.varnet import SensitivityModel
 from utils.common.loss_function import SSIMLoss
 
-# ✅ [최종 솔루션] 어떤 크기의 입력에도 대응할 수 있는 crop 또는 pad 함수
 def center_crop_or_pad(data: torch.Tensor, shape: tuple[int, int]):
-    """
-    Applies a center crop or zero pad to obtain shape.
-    Args:
-        data: The input tensor to be cropped or padded of shape [B, H, W].
-        shape: The desired output shape (H, W).
-    """
-    if not (0 < shape[0] and 0 < shape[1]):
-        raise ValueError("Invalid output shape.")
-
     h, w = data.shape[-2:]
     target_h, target_w = shape
-
-    # Crop or pad height
-    if h > target_h:
-        h_start = (h - target_h) // 2
-        h_end = h_start + target_h
-    else:
-        h_start = 0
-        h_end = h
-
-    # Crop or pad width
-    if w > target_w:
-        w_start = (w - target_w) // 2
-        w_end = w_start + target_w
-    else:
-        w_start = 0
-        w_end = w
-        
+    if h > target_h: h_start, h_end = (h - target_h) // 2, (h - target_h) // 2 + target_h
+    else: h_start, h_end = 0, h
+    if w > target_w: w_start, w_end = (w - target_w) // 2, (w - target_w) // 2 + target_w
+    else: w_start, w_end = 0, w
     cropped_data = data[..., h_start:h_end, w_start:w_end]
-
-    # Pad if necessary
     pad_h_top = (target_h - cropped_data.shape[-2]) // 2
     pad_h_bottom = target_h - cropped_data.shape[-2] - pad_h_top
     pad_w_left = (target_w - cropped_data.shape[-1]) // 2
     pad_w_right = target_w - cropped_data.shape[-1] - pad_w_left
-    
     padding = (pad_w_left, pad_w_right, pad_h_top, pad_h_bottom)
-    
-    if any(p > 0 for p in padding):
-        return F.pad(cropped_data, padding, "constant", 0)
-    else:
-        return cropped_data
+    return F.pad(cropped_data, padding, "constant", 0) if any(p > 0 for p in padding) else cropped_data
 
-
+# --- Helper Modules & Blocks (이전과 동일하여 생략) ---
 # --- Helper Modules ---
 class ConvBlock(nn.Module):
     def __init__(self, in_chans, out_chans, drop_prob=0.0):
         super().__init__()
+        # ✅ [FINAL FIX] 수치 안정을 위해 InstanceNorm2d 추가
         self.layers = nn.Sequential(
             nn.Conv2d(in_chans, out_chans, kernel_size=3, padding=1),
+            nn.InstanceNorm2d(out_chans), # ⬅️ 정규화 레이어
             nn.ReLU(),
             nn.Dropout2d(drop_prob),
             nn.Conv2d(out_chans, out_chans, kernel_size=3, padding=1),
+            nn.InstanceNorm2d(out_chans), # ⬅️ 정규화 레이어
             nn.ReLU(),
             nn.Dropout2d(drop_prob)
         )
     def forward(self, x): return self.layers(x)
 
-# --- Swin Transformer Components ---
 class WindowAttention(nn.Module):
     def __init__(self, dim, window_size, num_heads):
         super().__init__()
@@ -81,7 +50,6 @@ class WindowAttention(nn.Module):
         self.scale = (dim // num_heads) ** -0.5
         self.qkv = nn.Linear(dim, dim * 3)
         self.proj = nn.Linear(dim, dim)
-
     def forward(self, x, mask=None):
         B, N, C = x.shape
         qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
@@ -100,7 +68,6 @@ class SwinTransformerBlock(nn.Module):
         self.attn = WindowAttention(dim, window_size, num_heads)
         self.mlp = nn.Sequential(nn.Linear(dim, int(dim * mlp_ratio)), nn.GELU(), nn.Linear(int(dim * mlp_ratio), dim))
         self.window_size = window_size
-
     def forward(self, x, H, W, shift_size):
         B, L, C = x.shape
         shortcut = x
@@ -117,16 +84,14 @@ class SwinTransformerBlock(nn.Module):
         x = x.view(B, L, C)
         return shortcut + x + self.mlp(self.norm2(x))
 
-# --- MUST: Multi-scale Swin Transformer ---
 class MUST(nn.Module):
     def __init__(self, dim, pools, num_heads, window_size):
         super().__init__()
         self.depth = pools
         self.layers = nn.ModuleList([SwinTransformerBlock(dim=dim*(2**i), num_heads=num_heads, window_size=window_size) for i in range(pools)])
-        self.downsamples = nn.ModuleList([nn.Conv2d(dim*(2**i), dim*(2**(i+1)), kernel_size=2, stride=2) for i in range(pools - 1)])
-        self.upsamples = nn.ModuleList([nn.ConvTranspose2d(dim*(2**i), dim*(2**(i-1)), kernel_size=2, stride=2) for i in range(pools - 1, 0, -1)])
+        self.downsamples = nn.ModuleList([nn.Conv2d(dim*(2**i), dim*(2**(i+1)), 2, 2) for i in range(pools - 1)])
+        self.upsamples = nn.ModuleList([nn.ConvTranspose2d(dim*(2**i), dim*(2**(i-1)), 2, 2) for i in range(pools - 1, 0, -1)])
         self.convs = nn.ModuleList([ConvBlock(dim*(2**i), dim*(2**(i-1))) for i in range(pools - 1, 0, -1)])
-
     def forward(self, x):
         skips = []
         for i in range(self.depth):
@@ -140,11 +105,9 @@ class MUST(nn.Module):
             x = self.upsamples[i](x)
             skip_connection = skips[self.depth - 2 - i]
             if x.shape != skip_connection.shape: x = F.pad(x, (0, skip_connection.shape[3] - x.shape[3], 0, skip_connection.shape[2] - x.shape[2]))
-            x = torch.cat([x, skip_connection], dim=1)
-            x = self.convs[i](x)
+            x = torch.cat([x, skip_connection], dim=1); x = self.convs[i](x)
         return x
 
-# --- HMUST Block ---
 class HMUST(nn.Module):
     def __init__(self, scale, chans, pools, num_heads, window_size):
         super().__init__()
@@ -152,12 +115,11 @@ class HMUST(nn.Module):
         must_pools = max(1, int(torch.log2(torch.tensor(float(scale))).item()) + 1) if scale > 1 else 1
         self.H = ConvBlock(1, chans)
         if self.scale > 1:
-            self.L = nn.Conv2d(chans, chans, kernel_size=2, stride=scale)
+            self.L = nn.Conv2d(chans, chans, 2, 2)
             self.MUST = MUST(dim=chans, pools=must_pools, num_heads=num_heads, window_size=window_size)
-            self.R = nn.ConvTranspose2d(chans * 2, 1, kernel_size=2, stride=scale)
+            self.R = nn.ConvTranspose2d(chans * 2, 1, 2, 2)
         else:
             self.res_block = ConvBlock(chans, 1)
-
     def forward(self, x):
         h_feat = self.H(x)
         if self.scale > 1:
@@ -172,7 +134,6 @@ class HMUST(nn.Module):
             residual = F.interpolate(residual, size=x.shape[2:], mode='bilinear', align_corners=False)
         return x + residual
 
-# --- OSPN: Optimal Scale Prediction Network ---
 class OSPN(nn.Module):
     def __init__(self, pu_factors, rnn_hidden_size, scale_options):
         super().__init__()
@@ -181,7 +142,6 @@ class OSPN(nn.Module):
         self.U_layers = nn.ModuleList([nn.Linear(f*f - 1, rnn_hidden_size) for f in pu_factors if f*f-1 > 0])
         self.W_layer = nn.Linear(rnn_hidden_size, rnn_hidden_size)
         self.fc = nn.Linear(rnn_hidden_size, len(scale_options))
-
     def forward(self, x):
         B, _, H, W = x.shape
         with torch.no_grad():
@@ -199,8 +159,7 @@ class OSPN(nn.Module):
                 vs = (1.0 - loss_vals).reshape(B_comp, N_comp)
                 U_vs = self.U_layers[u_layer_idx](vs)
                 W_h = self.W_layer(hidden_state)
-                hidden_state = F.relu(U_vs + W_h)
-                u_layer_idx += 1
+                hidden_state = F.relu(U_vs + W_h); u_layer_idx += 1
             logits = self.fc(hidden_state)
             pred_indices = torch.argmax(logits, dim=1)
             pred_indices_list = pred_indices.cpu().tolist()
@@ -215,38 +174,42 @@ class dHUMUSNet(nn.Module):
         rnn_hidden_size: int, sens_chans: int, sens_pools: int, use_checkpoint: bool,
     ):
         super().__init__()
-        print("\n--- Initializing dHUMUS-Net (Final Stable Version) ---")
+        print("\n--- Initializing dHUMUS-Net (Normalized Version) ---")
+        # ... (이하 모든 코드는 이전 버전과 동일합니다)
         self.use_checkpoint, self.num_cascades = use_checkpoint, num_cascades
         self.sens_net = SensitivityModel(sens_chans, sens_pools)
         self.ospn = OSPN(pu_factors, rnn_hidden_size, scale_options)
         self.cascades = nn.ModuleList([nn.ModuleDict({f'scale_{s}': HMUST(s, chans, pools, num_heads, window_size) for s in scale_options}) for _ in range(num_cascades)])
         self.dc_weights = nn.Parameter(torch.ones(num_cascades))
 
-    def sens_expand(self, x: torch.Tensor, sens_maps: torch.Tensor) -> torch.Tensor:
-        return fastmri.fft2c(fastmri.complex_mul(x, sens_maps))
+    def sens_expand(self, x_complex: torch.Tensor, sens_maps_complex: torch.Tensor) -> torch.Tensor:
+        return torch.fft.fft2(x_complex * sens_maps_complex, norm="ortho")
     
-    def _cascade_forward(self, cascade_block, ospn_block, dc_weight, kspace_pred, ref_kspace, mask, sens_maps):
-        image = fastmri.rss(fastmri.complex_abs(fastmri.ifft2c(kspace_pred)), dim=1).unsqueeze(1)
+    def _cascade_forward(self, cascade_block, ospn_block, dc_weight, kspace_pred_complex, ref_kspace_complex, mask, sens_maps_complex):
+        image_space_pred = torch.fft.ifft2(kspace_pred_complex, norm="ortho")
+        image = torch.sqrt(torch.sum(torch.abs(image_space_pred)**2, dim=1, keepdim=True))
         predicted_scales = ospn_block(image)
         output_residuals = torch.zeros_like(image)
         for scale_val in torch.unique(predicted_scales):
             indices = (predicted_scales == scale_val).nonzero(as_tuple=True)[0]
-            hmust_module = cascade_block[f'scale_{scale_val.item()}']
-            output_residuals[indices] = hmust_module(image[indices])
-        complex_residuals = torch.stack([output_residuals.squeeze(1), torch.zeros_like(output_residuals).squeeze(1)], dim=-1)
-        model_term = self.sens_expand(complex_residuals, sens_maps)
-        soft_dc = torch.where(mask.to(torch.bool), kspace_pred - ref_kspace, torch.tensor(0.0, device=kspace_pred.device))
-        return kspace_pred - soft_dc * dc_weight - model_term
+            if len(indices) > 0:
+                hmust_module = cascade_block[f'scale_{scale_val.item()}']
+                output_residuals[indices] = hmust_module(image[indices])
+        complex_residuals = output_residuals.to(torch.complex64)
+        model_term = self.sens_expand(complex_residuals, sens_maps_complex)
+        mask_4d = mask.squeeze(-1)
+        soft_dc = torch.where(mask_4d.to(torch.bool), kspace_pred_complex - ref_kspace_complex, torch.tensor(0.0, device=kspace_pred_complex.device))
+        return kspace_pred_complex - soft_dc * dc_weight - model_term
 
     def forward(self, masked_kspace: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
-        sens_maps = self.sens_net(masked_kspace, mask)
-        kspace_pred = masked_kspace.clone()
+        masked_kspace_complex = torch.view_as_complex(masked_kspace)
+        sens_maps_complex = torch.view_as_complex(self.sens_net(masked_kspace, mask))
+        kspace_pred_complex = masked_kspace_complex.clone()
         for i in range(self.num_cascades):
             if self.use_checkpoint:
-                kspace_pred = checkpoint(self._cascade_forward, self.cascades[i], self.ospn, self.dc_weights[i], kspace_pred, masked_kspace, mask, sens_maps, use_reentrant=False)
+                kspace_pred_complex = checkpoint(self._cascade_forward, self.cascades[i], self.ospn, self.dc_weights[i], kspace_pred_complex, masked_kspace_complex, mask, sens_maps_complex, use_reentrant=False)
             else:
-                kspace_pred = self._cascade_forward(self.cascades[i], self.ospn, self.dc_weights[i], kspace_pred, masked_kspace, mask, sens_maps)
-        result = fastmri.rss(fastmri.complex_abs(fastmri.ifft2c(kspace_pred)), dim=1)
-        
-        # ✅ [FINAL FIX] `center_crop`을 `center_crop_or_pad`로 교체
+                kspace_pred_complex = self._cascade_forward(self.cascades[i], self.ospn, self.dc_weights[i], kspace_pred_complex, masked_kspace_complex, mask, sens_maps_complex)
+        final_image_space = torch.fft.ifft2(kspace_pred_complex, norm="ortho")
+        result = torch.sqrt(torch.sum(torch.abs(final_image_space)**2, dim=1))
         return center_crop_or_pad(result, (384, 384))
