@@ -14,6 +14,18 @@ try:
 except ModuleNotFoundError:
     wandb = None
 
+import os
+#---------------------------------------------------------#
+# 1. ❶ 메모리 단편화 완화용 CUDA allocator 옵션 ― 반드시
+#    torch import *이전*에 export 해야 효과가 납니다.  :contentReference[oaicite:0]{index=0}
+#---------------------------------------------------------#
+os.environ.setdefault(
+    "PYTORCH_CUDA_ALLOC_CONF",
+    "max_split_size_mb:64,garbage_collection_threshold:0.6"
+)
+
+import shutil
+
 from tqdm import tqdm
 from hydra.utils import instantiate          # ★ NEW
 from omegaconf import OmegaConf              # ★ NEW
@@ -32,12 +44,15 @@ from utils.common.loss_function import SSIMLoss # train loss & metric loss
 from utils.logging.receptive_field import log_receptive_field
 
 
-import os
 
 def train_epoch(args, epoch, model, data_loader, optimizer, scheduler,
                 loss_type, ssim_metric, metricLog_train,
-                scaler, amp_enabled, accum_steps):
+                scaler, amp_enabled, use_deepspeed, accum_steps):
     model.train()
+    # reset peak memory counter at the start of each epoch
+    torch.cuda.reset_peak_memory_stats()
+
+    # start_epoch = start_iter = time.perf_counter()
     len_loader = len(data_loader)
     total_loss = 0.
     total_slices = 0
@@ -69,28 +84,46 @@ def train_epoch(args, epoch, model, data_loader, optimizer, scheduler,
         current_loss = loss_type(output, target, maximum, cats)
         loss = current_loss.mean() / accum_steps
 
-        print("max alloc MB:", torch.cuda.max_memory_allocated() / 1024**2)
+        # print("max alloc MB:", torch.cuda.max_memory_allocated() / 1024**2)
+        # print("max memory_reserved MB:", torch.cuda.torch.cuda.max_memory_reserved() / 1024**2)
         # ─── Accumulation ──────────────────────────────────────────────
         if iter % accum_steps == 0:
-            optimizer.zero_grad(set_to_none=True)
+            if use_deepspeed:
+                model.zero_grad()
+            else:
+                optimizer.zero_grad(set_to_none=True)
 
-        if amp_enabled:
+        if use_deepspeed:
+            model.backward(loss)
+        elif amp_enabled:
             scaler.scale(loss).backward()
         else:
             loss.backward()
+
         # step & update?
         if (iter + 1) % accum_steps == 0 or (iter + 1) == len_loader:
-            if amp_enabled:
+            if use_deepspeed:
+                model.step()
+                model.zero_grad()
+            elif amp_enabled:
                 # unscale / clip_grad 등 필요 시 여기서
                 scaler.step(optimizer)
                 scaler.update()
+
+                optimizer.zero_grad(set_to_none=True)
+                torch.cuda.empty_cache()
             else:
                 optimizer.step()
 
-            if scheduler is not None:
-                # OneCycleLR·CyclicLR 등은 매 iteration 호출이 권장
+                # free gradient buffers right after the optimizer step
+                optimizer.zero_grad(set_to_none=True)
+                torch.cuda.empty_cache()
+
+            # ▶ DeepSpeed 엔진은 model.step() 안에서
+            #   scheduler.step() 을 이미 호출하므로 별도 호출 금지
+            if (not use_deepspeed) and scheduler is not None:
                 if isinstance(scheduler, (torch.optim.lr_scheduler.OneCycleLR,
-                                        torch.optim.lr_scheduler.CyclicLR)):
+                                          torch.optim.lr_scheduler.CyclicLR)):
                     scheduler.step()
         
         # -------- SSIM Metric (no grad) ----------------------------------
@@ -111,6 +144,10 @@ def train_epoch(args, epoch, model, data_loader, optimizer, scheduler,
         # 여기서는 샘플별로 호출해서, 각 slice 로깅
         for lv, sv, cat in zip(loss_vals, ssim_vals, cats):
             metricLog_train.update(lv, sv, [cat])
+
+        # ---------- ❸ loop 끝 직후 불필요 텐서 ‧ list 즉시 해제 --------------------
+        del output, current_loss, loss, loss_vals, ssim_loss_vals
+        torch.cuda.empty_cache()
 
     # total_loss = total_loss / len_loader
     # return total_loss, time.perf_counter() - start_epoch
@@ -162,6 +199,10 @@ def validate(args, model, data_loader, acc_val, epoch, loss_type, ssim_metric):
                 ssim_i = 1 - ssim_loss_i
                 total_ssim += ssim_i
                 acc_val.update(loss_i, ssim_i, [cats[i]])
+
+        # free per-slice tensors to reduce cached memory
+        del out_slice, tgt_slice, loss_i, ssim_loss_i
+        torch.cuda.empty_cache()
 
     for fname in reconstructions:
         reconstructions[fname] = np.stack(
@@ -248,15 +289,26 @@ def train(args):
 
 
     # ── 1. Optimizer 선택 (fallback: Adam) ─────────────────────────────
-    optim_cfg = getattr(args, "optimizer", None)
-    if optim_cfg is not None:
-        optimizer = instantiate(
-            OmegaConf.create(optim_cfg),        # cfg → OmegaConf 객체
-            params=model.parameters()           # 추가 인자주입
-        )
-    else:                                       # 안전장치
-        optimizer = torch.optim.Adam(model.parameters(), args.lr)
-    print(f"[Hydra] Optimizer ▶ {optimizer.__class__.__name__}")
+    # DeepSpeed 활성화 여부를 미리 확인
+    ds_cfg = getattr(args, "deepspeed", None)
+    use_deepspeed = ds_cfg is not None and ds_cfg.get("enable", False)
+
+    # DeepSpeed가 활성화된 경우, DeepSpeed의 옵티마이저를 강제 사용
+    if use_deepspeed:
+        print("[DeepSpeed] DeepSpeed 활성화! 기존 Optimizer 설정과 무관하게 DeepSpeed용 Optimizer로 변환합니다.")
+        optimizer = None # DeepSpeed가 자체적으로 옵티마이저를 생성하도록 None으로 설정
+        # ds_cfg["config"]["optimizer"] 블록을 직접 사용할 것이므로 여기서는 instantiate하지 않음
+    else:
+        # DeepSpeed가 비활성화된 경우, 기존 Hydrya 옵티마이저 설정 사용
+        optim_cfg = getattr(args, "optimizer", None)
+        if optim_cfg is not None:
+            optimizer = instantiate(
+                OmegaConf.create(optim_cfg),
+                params=model.parameters()
+            )
+        else:
+            optimizer = torch.optim.Adam(model.parameters(), args.lr)
+        print(f"[Hydra] Optimizer ▶ {optimizer.__class__.__name__}")
 
     # ─ train() 맨 앞쪽: train_loader 길이 한 번만 미리 계산 ─
     temp_loader = create_data_loaders(
@@ -264,61 +316,93 @@ def train(args):
         args=args,
         shuffle=True,
         augmenter=None,            # 길이만 알면 되므로 Augment 미적용
-        mask_augmenter=None
+        mask_augmenter=None,
+        is_train=True,
+        domain_filter=getattr(args, "domain_filter", None)
     )
     effective_steps = math.ceil(len(temp_loader) / accum_steps)
     del temp_loader                # 메모리 바로 반환
 
+    # ❷ DeepSpeed 스케줄러 파라미터 동적 채우기
+    ds_cfg = getattr(args, "deepspeed", None)
+    if ds_cfg and ds_cfg["config"].get("scheduler"):
+        sched_p = ds_cfg["config"]["scheduler"]["params"]
+        sched_p["warmup_num_steps"] = args.warmup_epochs * effective_steps
+        sched_p["total_num_steps"]  = args.num_epochs    * effective_steps
+
     # ──────────────── LR Scheduler (옵션) ────────────────
-    # 0) Config → OmegaConf
-    sched_cfg_raw = getattr(args, "LRscheduler", None)
-    scheduler = None
-    if sched_cfg_raw is not None:
-        sched_cfg = OmegaConf.create(sched_cfg_raw)   # dict → OmegaConf
+    # DeepSpeed가 활성화된 경우, DeepSpeed의 scheduler 설정을 사용
+    if use_deepspeed:
+        # DeepSpeed가 ds_cfg에서 scheduler를 읽어오므로, 여기서는 별도로 instantiate하지 않음
+        scheduler = None # DeepSpeed가 자체적으로 스케줄러를 관리하도록 None으로 설정
+        # ds_cfg["config"]["scheduler"] 블록을 직접 사용할 것임
+    else:
+        # 0) Config → OmegaConf
+        sched_cfg_raw = getattr(args, "LRscheduler", None)
+        scheduler = None
+        if sched_cfg_raw is not None:
+            sched_cfg = OmegaConf.create(sched_cfg_raw)   # dict → OmegaConf
 
-        # 1) 공통 계산
-        temp_loader = create_data_loaders(
-            data_path=args.data_path_train,
-            args=args,
-            shuffle=True,
-            augmenter=None,
-            mask_augmenter=None,
-            is_train=True,      # ★ train만 True
+            # 1) 공통 계산
+            temp_loader = create_data_loaders(
+                data_path=args.data_path_train,
+                args=args,
+                shuffle=True,
+                augmenter=None,
+                mask_augmenter=None,
+                is_train=True,      # ★ train만 True
+                domain_filter=getattr(args, "domain_filter", None),
+            )
+            effective_steps = math.ceil(len(temp_loader) / accum_steps)
+            del temp_loader
+
+            # 2) target class 로드 & 시그니처 분석
+            target_path = sched_cfg["_target_"]
+            mod_name, cls_name = target_path.rsplit(".", 1)
+            SchedulerCls = getattr(import_module(mod_name), cls_name)
+            sig = inspect.signature(SchedulerCls.__init__)
+            valid_keys = set(sig.parameters.keys())        # 허용 인수 목록
+
+            # 3) 필요한 key만 conditionally 추가
+            if "effective_steps" in sched_cfg and "effective_steps" not in valid_keys:
+                del sched_cfg["effective_steps"]
+
+            # CyclicLR
+            if cls_name == "CyclicLR":
+                sched_cfg["effective_steps"] = effective_steps
+                sched_cfg["step_size_up"] = sched_cfg.get(
+                    "step_size_up", effective_steps * 2
+                )
+                sched_cfg["max_lr"] = sched_cfg.get("max_lr", args.lr * 6)
+
+            # OneCycleLR
+            if cls_name == "OneCycleLR":
+                sched_cfg["effective_steps"] = effective_steps
+                sched_cfg["total_steps"] = sched_cfg.get(
+                    "total_steps", effective_steps * args.num_epochs
+                )
+                sched_cfg["max_lr"] = sched_cfg.get("max_lr", args.lr * 10)
+
+            # 4) instantiate (불필요 인수 제거 후)
+            clean_dict = {k: v for k, v in sched_cfg.items() if k in valid_keys or k.startswith("_")}
+            scheduler = instantiate(OmegaConf.create(clean_dict), optimizer=optimizer)
+            print(f"[Hydra] Scheduler ▶ {scheduler}")
+
+    # ── ❷ DeepSpeed 옵션 적용 ────────────────────────────────
+    print("[DeepSpeed] use_deepspeed",use_deepspeed)
+    print(ds_cfg)
+    if use_deepspeed:
+        import deepspeed                                       # :contentReference[oaicite:3]{index=3}
+        model, optimizer, scheduler, _ = deepspeed.initialize(
+            model=model,
+            optimizer=optimizer,      
+            model_parameters=model.parameters(),
+            config=ds_cfg["config"]
         )
-        effective_steps = math.ceil(len(temp_loader) / accum_steps)
-        del temp_loader
-
-        # 2) target class 로드 & 시그니처 분석
-        target_path = sched_cfg["_target_"]
-        mod_name, cls_name = target_path.rsplit(".", 1)
-        SchedulerCls = getattr(import_module(mod_name), cls_name)
-        sig = inspect.signature(SchedulerCls.__init__)
-        valid_keys = set(sig.parameters.keys())        # 허용 인수 목록
-
-        # 3) 필요한 key만 conditionally 추가
-        if "effective_steps" in sched_cfg and "effective_steps" not in valid_keys:
-            del sched_cfg["effective_steps"]
-
-        # CyclicLR
-        if cls_name == "CyclicLR":
-            sched_cfg["effective_steps"] = effective_steps
-            sched_cfg["step_size_up"] = sched_cfg.get(
-                "step_size_up", effective_steps * 2
-            )
-            sched_cfg["max_lr"] = sched_cfg.get("max_lr", args.lr * 6)
-
-        # OneCycleLR
-        if cls_name == "OneCycleLR":
-            sched_cfg["effective_steps"] = effective_steps
-            sched_cfg["total_steps"] = sched_cfg.get(
-                "total_steps", effective_steps * args.num_epochs
-            )
-            sched_cfg["max_lr"] = sched_cfg.get("max_lr", args.lr * 10)
-
-        # 4) instantiate (불필요 인수 제거 후)
-        clean_dict = {k: v for k, v in sched_cfg.items() if k in valid_keys or k.startswith("_")}
-        scheduler = instantiate(OmegaConf.create(clean_dict), optimizer=optimizer)
-        print(f"[Hydra] Scheduler ▶ {scheduler}")
+        print("[DeepSpeed] enabled → ZeRO-Stage",
+              ds_cfg["config"]["zero_optimization"]["stage"])
+        print(f"[DeepSpeed] 최종 Optimizer: {optimizer.__class__.__name__}")
+        print(f"[DeepSpeed] 최종 LR Scheduler: {scheduler.__class__.__name__ if scheduler else 'None'}")
 
 
     # ✨ Augmenter 객체 생성
@@ -346,6 +430,7 @@ def train(args):
     best_val_ssim = 0.0
     val_loss_history = [] # val loss기록 for augmenter
 
+    print(f"[Resume] {getattr(args, 'resume_checkpoint', None)}")
     if getattr(args, 'resume_checkpoint', None):
         ckpt = torch.load(args.resume_checkpoint, map_location=device, weights_only=False)
         model.load_state_dict(ckpt['model'])
@@ -394,6 +479,7 @@ def train(args):
                                      augmenter=None,
                                      mask_augmenter=None,
                                      is_train=False,     # ★ val/test는 False)
+                                     domain_filter=getattr(args, "domain_filter", None),
     )
     
     val_loss_log = np.empty((0, 2))
@@ -417,13 +503,15 @@ def train(args):
             shuffle=True, 
             augmenter=augmenter, # 업데이트된 augmenter 전달
             mask_augmenter=mask_augmenter,
-            is_train=True      # ★ train만 True
+            is_train=True,      # ★ train만 True
+            domain_filter=getattr(args, "domain_filter", None),
         )
 
         train_loss, train_time = train_epoch(args, epoch, model,
                                              train_loader, optimizer, scheduler,
                                              loss_type, ssim_metric, MetricLog_train,
-                                             scaler, amp_enabled, accum_steps)
+                                             scaler, amp_enabled,use_deepspeed,
+                                             accum_steps)
         val_loss,val_ssim, num_subjects, reconstructions, targets, inputs, val_time = validate(args, model, val_loader,
                                                                                         MetricLog_val, epoch,
                                                                                         loss_type, ssim_metric)
@@ -539,6 +627,9 @@ def train(args):
 
         # ────────── epoch 루프 내부, val 계산·로그 이후 ──────────
         current_epoch = epoch + 1         # 사람 눈금 1-base
+        # release dataloader workers & cached memory before next epoch
+        del train_loader
+        torch.cuda.empty_cache()
         if early_enabled and current_epoch in stage_table:
             req = stage_table[current_epoch]
             if val_ssim < req:

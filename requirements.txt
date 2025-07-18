@@ -17,3 +17,5 @@ lion-pytorch
 adabelief-pytorch
 pytorch-msssim
 pandas
+deepspeed
+mpi4py

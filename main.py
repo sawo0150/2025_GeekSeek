@@ -44,7 +44,7 @@ def _flatten_cfg_to_args(cfg: DictConfig) -> SimpleNamespace:
             PRESERVE = {"model", "data", "LRscheduler", "LossFunction", 
                         "optimizer", "compressor", "collator", "sampler",
                         "evaluation", "early_stop", "maskDuplicate","maskAugment"
-                        ,"aug", "centerCropPadding"
+                        ,"aug", "centerCropPadding", "deepspeed",
                         }
 
             # (1) 보존용 속성 먼저 세팅
@@ -64,12 +64,13 @@ def _flatten_cfg_to_args(cfg: DictConfig) -> SimpleNamespace:
     args.GPU_NUM         = container["GPU_NUM"]
     args.use_wandb       = container["wandb"]["use_wandb"]
     args.max_vis_per_cat = container["wandb"]["max_vis_per_cat"]
+    args.deepspeed = container["training"]["deepspeed"]
 
     # 4) Path 변환: data_path_* 를 Path 객체로 변경하여 load_data 에서의 '/' 연산 오류 방지
     if hasattr(args, 'data_path_train'):
         args.data_path_train = Path(args.data_path_train)
     if hasattr(args, 'data_path_val'):
-        args.data_path_val = Path(args.data_path_val)
+        args.data_path_val     = Path(args.data_path_val)
 
     # 5) 결과 경로 세팅 (train.py 로직 반영) :contentReference[oaicite:1]{index=1}
     result_dir = Path(cfg.data.PROJECT_ROOT) / "result" / args.exp_name
@@ -79,6 +80,10 @@ def _flatten_cfg_to_args(cfg: DictConfig) -> SimpleNamespace:
     args.val_loss_dir = result_dir
     for p in [args.exp_dir, args.val_dir]:
         p.mkdir(parents=True, exist_ok=True)
+
+    # ─ domain_filter(옵션) 전달
+    if "data" in cfg and "domain_filter" in cfg["data"]:
+        args.domain_filter = cfg.data.domain_filter
 
     return args
 

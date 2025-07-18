@@ -1,6 +1,11 @@
 amp:           false        # mixed-precision
-checkpointing: true        # gradient_checkpoint
-accum_steps:   10            # gradient_accumulation (1이면 이 기능 끄는거임.)
+checkpointing: false        # gradient_checkpoint
+accum_steps:   2            # gradient_accumulation (1이면 이 기능 끄는거임.)
+# (cascade, chans, sens_chans)
+# deepspeed false (18,18,8), checkpoint O : 7000, 11056 (max_memory_allocated, max max_memory_reserved MB)
+# deepspeed true  (18,18,8), checkpoint O : 8392, 11024 (stage 1)
+# deepspeed true  (18,18,8), checkpoint O : 8381, 11034 (stage 2)
+# deepspeed true  (18,18,8), checkpoint O : 8385, 10984 (stage 3)
 
 deepspeed:
   enable:       false        # ← 스위치 - true or false

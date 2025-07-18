@@ -122,105 +122,76 @@ class FIVarNet(nn.Module):
             num_low_frequencies=num_low_frequencies,
         )
         # Do DC in feature-space
+
+        # print(f"Memory after _encode_input: {torch.cuda.max_memory_allocated() / (1024**2):.2f} MB")
+        # print(f"  sens_maps size: {feature_image.sens_maps.element_size() * feature_image.sens_maps.numel() / (1024**2):.2f} MB")
+        # print(f"  ref_kspace size: {feature_image.ref_kspace.element_size() * feature_image.ref_kspace.numel() / (1024**2):.2f} MB")
+        # print(f"  features size: {feature_image.features.element_size() * feature_image.features.numel() / (1024**2):.2f} MB")
+
+
         # feature_image = self.cascades(feature_image)
         # — feature‐space cascades (checkpoint 옵션 적용) —
-        # new_fi = feature_image
-        # for block in self.feat_cascades:
-        #     if self.use_checkpoint:
-        #         # 1) gradient 필요한 텐서만 꺼내기
-        #         feats = new_fi.features
+        new_fi = feature_image
+        for block in self.feat_cascades:
+            if self.use_checkpoint:
+                # 1) gradient 필요한 텐서만 꺼내기
+                feats = new_fi.features
 
-        #         # 2) closure 로 나머지 인자 캡처하기
-        #         sens_maps = new_fi.sens_maps
-        #         means     = new_fi.means
-        #         variances = new_fi.variances
-        #         mask0     = new_fi.mask
-        #         ref_ksp   = new_fi.ref_kspace
-        #         crop_sz   = new_fi.crop_size
+                # 2) closure 로 나머지 인자 캡처하기
+                #    참고: Python의 클로저(closure)는 외부 스코프의 변수를 "캡처"하여
+                #    함수 호출 시에도 해당 값을 유지하게 합니다.
+                #    여기서는 FeatureImage의 변경되지 않는 멤버들을 캡처합니다.
+                sens_maps = new_fi.sens_maps
+                means     = new_fi.means
+                variances = new_fi.variances
+                mask0     = new_fi.mask
+                ref_ksp   = new_fi.ref_kspace
+                crop_sz   = new_fi.crop_size
 
-        #         # 3) 순수 함수 정의: Tensor -> Tensor
-        #         def run_block(feats, 
-        #                       _block=block,  # 여기서 block 인스턴스를 고정
-        #                       sens_maps=sens_maps,
-        #                       means=means,
-        #                       variances=variances,
-        #                       mask0=mask0,
-        #                       ref_ksp=ref_ksp,
-        #                       crop_sz=crop_sz):
-        #             fi = FeatureImage(
-        #                 features=feats,
-        #                 sens_maps=sens_maps,
-        #                 crop_size=crop_sz,
-        #                 means=means,
-        #                 variances=variances,
-        #                 mask=mask0,
-        #                 ref_kspace=ref_ksp,
-        #             )
-        #             out = _block(fi)
-        #             return out.features
+                # 3) 순수 함수 정의: Tensor (features) -> Tensor (new features)
+                #    checkpoint는 입력으로 받는 텐서들(여기서는 `feats`)에 대해서만
+                #    autograd 연산을 추적하고 재계산을 수행합니다.
+                #    캡처된 나머지 인자들은 재계산 대상이 아니므로 메모리 오버헤드를 줄입니다.
+                def run_block(feats_input,
+                              _block=block,  # 현재 cascade 블록 인스턴스 고정
+                              sens_maps=sens_maps,
+                              means=means,
+                              variances=variances,
+                              mask0=mask0,
+                              ref_ksp=ref_ksp,
+                              crop_sz=crop_sz):
+                    fi = FeatureImage(
+                        features=feats_input,
+                        sens_maps=sens_maps,
+                        crop_size=crop_sz,
+                        means=means,
+                        variances=variances,
+                        mask=mask0,
+                        ref_kspace=ref_ksp,
+                    )
+                    out = _block(fi)
+                    return out.features
 
-        #         # 4) checkpoint
-        #         new_feats = checkpoint(run_block, feats, use_reentrant=False)
+                # 4) checkpoint 호출: `feats`에 대해서만 재계산 로직 적용
+                new_feats = checkpoint(run_block, feats, use_reentrant=False)
 
-        #         # 5) NamedTuple 재조합
-        #         new_fi = FeatureImage(
-        #             features   = new_feats,
-        #             sens_maps  = sens_maps,
-        #             crop_size  = crop_sz,
-        #             means      = means,
-        #             variances  = variances,
-        #             mask       = mask0,
-        #             ref_kspace = ref_ksp,
-        #         )
-        #     else:
-        #         new_fi = block(new_fi)
+                # 5) NamedTuple 재조합: 변경된 features와 기존 캡처된 멤버들로 새로운 FeatureImage 생성
+                new_fi = FeatureImage(
+                    features   = new_feats,
+                    sens_maps  = sens_maps,
+                    crop_size  = crop_sz,
+                    means      = means,
+                    variances  = variances,
+                    mask       = mask0,
+                    ref_kspace = ref_ksp,
+                )
+            else:
+                new_fi = block(new_fi)
 
-        # feature_image = new_fi
+        feature_image = new_fi
 
-        feats, sens_maps, means, variances, mask0, ref_ksp, crop_sz = (
-            feature_image.features,
-            feature_image.sens_maps,
-            feature_image.means,
-            feature_image.variances,
-            feature_image.mask,
-            feature_image.ref_kspace,
-            feature_image.crop_size,
-        )
+        # print(f"Memory after feat_cascades: {torch.cuda.max_memory_allocated() / (1024**2):.2f} MB")
 
-        # 2) feature‐space 전체 캐스케이드 run 을 pure function 으로 정의
-        def run_all_feat(feats, sens_maps, means, variances, mask0, ref_ksp, crop_sz):
-            fi = FeatureImage(
-                features=feats,
-                sens_maps=sens_maps,
-                crop_size=crop_sz,
-                means=means,
-                variances=variances,
-                mask=mask0,
-                ref_kspace=ref_ksp,
-            )
-            for block in self.feat_cascades:
-                fi = block(fi)
-            return fi.features
-
-        # 3) 한 번만 체크포인트 호출
-        if self.use_checkpoint:
-            new_feats = checkpoint(
-                run_all_feat,
-                feats, sens_maps, means, variances, mask0, ref_ksp, crop_sz,
-                use_reentrant=False,
-            )
-        else:
-            new_feats = run_all_feat(feats, sens_maps, means, variances, mask0, ref_ksp, crop_sz)
-
-        feature_image = FeatureImage(
-            features=new_feats,
-            sens_maps=sens_maps,
-            crop_size=crop_sz,
-            means=means,
-            variances=variances,
-            mask=mask0,
-            ref_kspace=ref_ksp,
-        )
 
 
         # Find last k-space
@@ -266,6 +237,7 @@ class IFVarNet(nn.Module):
         mask_center: bool = True,
         image_conv_cascades: Optional[List[int]] = None,
         kspace_mult_factor: float = 1e6,
+        use_checkpoint: bool = False,          # ★ NEW
     ):
         super().__init__()
         if image_conv_cascades is None:
@@ -273,6 +245,7 @@ class IFVarNet(nn.Module):
 
         self.image_conv_cascades = image_conv_cascades
         self.kspace_mult_factor = kspace_mult_factor
+        self.use_checkpoint     = use_checkpoint   # ★ NEW
         self.sens_net = SensitivityModel(
             chans=sens_chans,
             num_pools=sens_pools,
@@ -349,9 +322,17 @@ class IFVarNet(nn.Module):
 
         sens_maps = self.sens_net(masked_kspace, mask, num_low_frequencies)
         kspace_pred = masked_kspace.clone()
+
         # Run E2EVN
-        for cascade in self.image_cascades:
-            kspace_pred = cascade(kspace_pred, masked_kspace, mask, sens_maps)
+        # for cascade in self.image_cascades:
+        #     kspace_pred = cascade(kspace_pred, masked_kspace, mask, sens_maps)
+        for block in self.image_cascades:          # ★ allow ckpt
+            if self.use_checkpoint:
+                kspace_pred = checkpoint(
+                    block, kspace_pred, masked_kspace, mask, sens_maps
+                )
+            else:
+                kspace_pred = block(kspace_pred, masked_kspace, mask, sens_maps)
 
         feature_image = self._encode_input(
             masked_kspace=kspace_pred,
@@ -360,14 +341,24 @@ class IFVarNet(nn.Module):
             mask=mask,
             crop_size=crop_size,
         )
-        feature_image = self.cascades(feature_image)
+        # feature_image = self.cascades(feature_image)
+
+        # --- feature-space cascades (ckpt 지원) ---
+        for block in self.cascades:
+            if self.use_checkpoint:
+                feature_image = checkpoint(block, feature_image) 
+            else:
+                feature_image = block(feature_image)
+        
         kspace_pred = self._decode_output(feature_image)
         kspace_pred = (
             kspace_pred / self.kspace_mult_factor
         )  # Ensure kspace_pred is a Tensor
-        return rss(
-            complex_abs(ifft2c(kspace_pred)), dim=1
-        )  # Ensure kspace_pred is a Tensor
+        # return rss(
+        #     complex_abs(ifft2c(kspace_pred)), dim=1
+        # )  # Ensure kspace_pred is a Tensor
+        img = rss(complex_abs(ifft2c(kspace_pred)), dim=1)
+        return center_crop(img, 384, 384)          # ★ VarNet 스타일 crop
 
 
 class FeatureVarNet_sh_w(nn.Module):
@@ -381,6 +372,7 @@ class FeatureVarNet_sh_w(nn.Module):
         mask_center: bool = True,
         image_conv_cascades: Optional[List[int]] = None,
         kspace_mult_factor: float = 1e6,
+        use_checkpoint: bool = False,              # ★ NEW
     ):
         super().__init__()
         if image_conv_cascades is None:
@@ -388,6 +380,7 @@ class FeatureVarNet_sh_w(nn.Module):
 
         self.image_conv_cascades = image_conv_cascades
         self.kspace_mult_factor = kspace_mult_factor
+        self.use_checkpoint     = use_checkpoint   # ★ NEW
         self.sens_net = SensitivityModel(
             chans=sens_chans,
             num_pools=sens_pools,
@@ -462,17 +455,22 @@ class FeatureVarNet_sh_w(nn.Module):
             num_low_frequencies=num_low_frequencies,
         )
         # Do DC in feature-space
-        feature_image = self.cascades(feature_image)
+        # feature_image = self.cascades(feature_image)
+        # --- feature-space cascades (ckpt 지원) ---
+        for block in self.cascades:
+            feature_image = checkpoint(block, feature_image) if self.use_checkpoint else block(feature_image)
+
         # Find last k-space
         kspace_pred = self._decode_output(feature_image)
         # Return Final Image
         kspace_pred = (
             kspace_pred / self.kspace_mult_factor
         )  # Ensure kspace_pred is a Tensor
-        return rss(
-            complex_abs(ifft2c(kspace_pred)), dim=1
-        )  # Ensure kspace_pred is a Tensor
-
+        # return rss(
+        #     complex_abs(ifft2c(kspace_pred)), dim=1
+        # )  # Ensure kspace_pred is a Tensor
+        img = rss(complex_abs(ifft2c(kspace_pred)), dim=1)
+        return center_crop(img, 384, 384)
 
 class FeatureVarNet_n_sh_w(nn.Module):
     def __init__(
@@ -485,6 +483,7 @@ class FeatureVarNet_n_sh_w(nn.Module):
         mask_center: bool = True,
         image_conv_cascades: Optional[List[int]] = None,
         kspace_mult_factor: float = 1e6,
+        use_checkpoint: bool = False,
     ):
         super().__init__()
         if image_conv_cascades is None:
@@ -492,6 +491,7 @@ class FeatureVarNet_n_sh_w(nn.Module):
 
         self.image_conv_cascades = image_conv_cascades
         self.kspace_mult_factor = kspace_mult_factor
+        self.use_checkpoint     = use_checkpoint
         self.sens_net = SensitivityModel(
             chans=sens_chans,
             num_pools=sens_pools,
@@ -566,16 +566,18 @@ class FeatureVarNet_n_sh_w(nn.Module):
             num_low_frequencies=num_low_frequencies,
         )
         # Do DC in feature-space
-        feature_image = self.cascades(feature_image)
+        # feature_image = self.cascades(feature_image)
+        for block in self.cascades:
+            feature_image = checkpoint(block, feature_image) if self.use_checkpoint else block(feature_image)
+
         # Find last k-space
         kspace_pred = self._decode_output(feature_image)
         # Return Final Image
         kspace_pred = (
             kspace_pred / self.kspace_mult_factor
         )  # Ensure kspace_pred is a Tensor
-        return rss(
-            complex_abs(ifft2c(kspace_pred)), dim=1
-        )  # Ensure kspace_pred is a Tensor
+        img = rss(complex_abs(ifft2c(kspace_pred)), dim=1)
+        return center_crop(img, 384, 384)
 
 
 class AttentionFeatureVarNet_n_sh_w(nn.Module):
@@ -590,6 +592,7 @@ class AttentionFeatureVarNet_n_sh_w(nn.Module):
         mask_center: bool = True,
         image_conv_cascades: Optional[List[int]] = None,
         kspace_mult_factor: float = 1e6,
+        use_checkpoint: bool = False,
     ):
         super().__init__()
         if image_conv_cascades is None:
@@ -597,6 +600,7 @@ class AttentionFeatureVarNet_n_sh_w(nn.Module):
 
         self.image_conv_cascades = image_conv_cascades
         self.kspace_mult_factor = kspace_mult_factor
+        self.use_checkpoint     = use_checkpoint
         self.sens_net = SensitivityModel(
             chans=sens_chans,
             num_pools=sens_pools,
@@ -673,17 +677,22 @@ class AttentionFeatureVarNet_n_sh_w(nn.Module):
             num_low_frequencies=num_low_frequencies,
         )
         # Do DC in feature-space
-        feature_image = self.cascades(feature_image)
+        # feature_image = self.cascades(feature_image)
+
+        for block in self.cascades:
+            feature_image = checkpoint(block, feature_image) if self.use_checkpoint else block(feature_image)
+
         # Find last k-space
         kspace_pred = self._decode_output(feature_image)
         # Return Final Image
         kspace_pred = (
             kspace_pred / self.kspace_mult_factor
         )  # Ensure kspace_pred is a Tensor
-        return rss(
-            complex_abs(ifft2c(kspace_pred)), dim=1
-        )  # Ensure kspace_pred is a Tensor
-
+        # return rss(
+        #     complex_abs(ifft2c(kspace_pred)), dim=1
+        # )  # Ensure kspace_pred is a Tensor
+        img = rss(complex_abs(ifft2c(kspace_pred)), dim=1)
+        return center_crop(img, 384, 384)
 
 class E2EVarNet(nn.Module):
     """
