@@ -6,7 +6,7 @@ defaults:
   - data: cluster         # 데이터 경로 설정
   - LRscheduler: ExponentialLR        # ⬅️  추가 - https://gaussian37.github.io/dl-pytorch-lr_scheduler/참고
   - LossFunction: SSIM+L1
-  - training: base          # base or vessl_vramMin
+  - training: vessl_vramMin     # base or vessl_vramMin
   - early_stop: none    # 조기종료 기능 : early_stop or none
   - evaluation: leaderboard_cluster
   - optimizer: nadam          # ⬅️ 새로 추가  
@@ -33,7 +33,7 @@ report_interval: 500
 seed: 430
 num_workers: 10
 
-exp_name : amp_sweeping
+exp_name : varnet_sweeping
 
 # these three are *required* by utils/data/load_data.py → create_data_loaders
 input_key:  kspace

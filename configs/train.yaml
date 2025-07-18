@@ -34,7 +34,7 @@ report_interval: 500
 seed: 430
 num_workers: 4
 
-exp_name : fi_varnet_Test
+exp_name : dHUMUS_Test
 
 # these three are *required* by utils/data/load_data.py → create_data_loaders
 input_key:  kspace

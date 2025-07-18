@@ -16,8 +16,8 @@ parameters:
     
   aug_strength:
     distribution: uniform
-    min: 0.5
-    max: 1.0
+    min: 0.3
+    max: 0.9
 
 
      # +++ 이 부분을 추가하여 maskDuplicate 기능을 비활성화합니다 +++
