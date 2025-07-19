@@ -24,7 +24,7 @@ aug_schedule_mode: 'epoch'
 aug_schedule_type: 'ramp'
 
 # --- 'epoch' 모드 전용 파라미터 ---
-max_epochs: ${num_epochs}      # train.yaml의 num_epochs 값을 그대로 사용
+max_epochs: ${max_epochs}      # train.yaml의 num_epochs 값을 그대로 사용
 
 # --- 'val_loss' 모드 전용 파라미터 ---
 val_loss_window_size: 5      # 기울기 계산에 사용할 과거 val_loss의 개수

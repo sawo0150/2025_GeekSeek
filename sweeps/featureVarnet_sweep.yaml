@@ -1,0 +1,22 @@
+# wandb sweep sweeps/featureVarnet_sweep.yaml
+method: grid
+name: featureVar_grid_2025_a100
+project: AMP_sweep        # ✅ 원하는 프로젝트 이름
+
+parameters:
+  model:
+    values:
+      - attention_featurevarnet_n_sh_w
+      - featurevarnet_n_sh_w
+      - featurevarnet_sh_w
+      - fivarnet
+      - ifvarnet
+
+program: sweeps/train_entry.py
+command:
+  - ${env}
+  - python
+  - ${program}
+  # - "--config-name=train_cluster_varnet_Ver2"   # 기본 Hydra config
+  - "--config-name=train"
+  - ${args}                            # ↑ parameters 가 여기로 풀림

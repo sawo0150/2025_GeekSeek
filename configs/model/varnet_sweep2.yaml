@@ -2,11 +2,21 @@
 _target_: utils.model.varnet.VarNet
 
 num_cascades: 18
-chans: 18
+chans: 16
 sens_chans: 8
 
-# checkpointing 켰다고 가정 : 7170
-# checkpointing + amp 가정 : 4548 / 6958
+# (20,18,8)
+# checkpointing 켰다고 가정 : 7170 -> 학습 불가
+# checkpointing + amp 가정 : 4548 / 6958 -> 학습 가능
+
+# (18,18,8)
+# checkpointing 켰다고 가정 : 7002 / 10938 -> 학습 불가
+
+# (18,16,8)
+# checkpointing 켰다고 가정 : 6820 / 10710
+
+# (16,16,8)
+# checkpointing 켰다고 가정 : 6665 / 10446
 
 # 최대 모델 크기 잡는 방법
 # 일단 amp안키고, checkpointing 만 킨 상태로 7gb~7.2gb정도 되는 조건 찾기 (max_allocated_mem)

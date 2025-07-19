@@ -8,7 +8,7 @@ aug_strength: 0.6 # p_max: 최대 적용 확률
 aug_delay: 5      # delay epoch 수 (0~4 epoch 은 p=0)
 aug_schedule_mode: epoch  # 'epoch' | 'val_loss' | 'constant'
 aug_schedule_type: ramp   # 'epoch' | 'val_loss' | 'constant'
-max_epochs: ${num_epochs} # 스케줄이 T 에 도달하면 p=p_max
+max_epochs: ${max_epochs} # 스케줄이 T 에 도달하면 p=p_max
 val_loss_window_size: 5   # (val_loss 모드) 기울기 계산용 윈도우
 val_loss_grad_start: -0.05  #   ─┐ 기울기가 이보다 크면 k=0
 val_loss_grad_plateau: -0.001 #   └─ 기울기가 이보다 작으면 k=1

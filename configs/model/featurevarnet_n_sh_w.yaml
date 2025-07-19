@@ -1,9 +1,15 @@
 _target_: utils.model.feature_varnet.FeatureVarNet_n_sh_w
-num_cascades: 10
+num_cascades: 8
 chans: 9
 pools: 4
 sens_chans: 8
 sens_pools: 4
 mask_center: true
 kspace_mult_factor: 1e6
-use_checkpoint: true
+
+
+# (7,9,8) : checkpointing O : 6816
+# (8,9,8) : checkpointing O : 6948
+# ---- 여기까지 최선...?
+
+# (10,9,8) : checkpointing O : 7215
