@@ -3,7 +3,7 @@
 defaults:
   - _self_
   - model: varnet_sweep2   # 모델 설정  varnet_sweep2 or fivarnet_small
-  - data: local_sangwonDesktop         # 데이터 경로 설정
+  - data: local_gpu        # 데이터 경로 설정
   - LRscheduler: ExponentialLR        # ⬅️  추가 - https://gaussian37.github.io/dl-pytorch-lr_scheduler/참고
   - LossFunction: SSIM+L1
   - training: base_sw          # base or vessl_vramMin or base_sw
@@ -48,4 +48,4 @@ wandb:
   max_vis_per_cat: 5        # epoch 마다 카테고리별 이미지 수 (0 → 안 올림)
 
   use_visLogging: true
-  use_receptiveField: false
+  use_receptiveField: true
