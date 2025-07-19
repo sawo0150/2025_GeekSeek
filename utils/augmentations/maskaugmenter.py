@@ -33,6 +33,8 @@ class MaskAugmenter:
         self.win   = val_loss_window_size
         self.grad0 = val_loss_grad_start
         self.grad1 = val_loss_grad_plateau
+
+        print("[Mask Aug] max_epochs : ", self.T)
         # --- Mask spec -----------------------------------------
         self.mask_specs = mask_specs
         self.allow_any  = allow_any_combination

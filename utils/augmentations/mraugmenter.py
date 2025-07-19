@@ -64,6 +64,7 @@ class MRAugmenter:
         self.max_shear_angle = max_shear_angle
 
         self.rng = np.random.RandomState()
+        print("[MRAug] max_epochs : ",max_epochs)
         
         # ✨ 상태 저장을 위한 변수 초기화
         self.current_epoch = 0

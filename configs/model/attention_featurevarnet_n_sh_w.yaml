@@ -1,5 +1,5 @@
 _target_: utils.model.feature_varnet.AttentionFeatureVarNet_n_sh_w
-num_cascades: 10
+num_cascades: 7
 chans: 9
 pools: 4
 sens_chans: 8
@@ -7,4 +7,13 @@ sens_pools: 4
 acceleration: 4
 mask_center: true
 kspace_mult_factor: 1e6
-use_checkpoint: true
+
+
+
+# (6,9,8) : checkpointing O : 6846
+# (7,9,8) : checkpointing O : 6982
+
+# ---- 여기까지 최선...?
+# (8,9,8) : checkpointing O : 7103
+
+# (10,9,8) : checkpointing O : 7374

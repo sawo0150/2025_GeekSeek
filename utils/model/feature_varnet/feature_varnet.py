@@ -74,11 +74,25 @@ class FIVarNet(nn.Module):
         self.norm_fn = NormStats()
 
     def _decode_output(self, feature_image: FeatureImage) -> Tensor:
-        image = self.decoder(
-            self.decode_norm(feature_image.features),
-            means=feature_image.means,
-            variances=feature_image.variances,
-        )
+        # image = self.decoder(
+        #     self.decode_norm(feature_image.features),
+        #     means=feature_image.means,
+        #     variances=feature_image.variances,
+        # )
+        if self.use_checkpoint:
+            image = checkpoint(
+                lambda feats, m, v: self.decoder(feats, means=m, variances=v),
+                self.decode_norm(feature_image.features),
+                feature_image.means,
+                feature_image.variances,
+                use_reentrant=False
+            )
+        else:
+            image = self.decoder(
+                self.decode_norm(feature_image.features),
+                means=feature_image.means,
+                variances=feature_image.variances,
+            )
         return sens_expand(image, feature_image.sens_maps)
 
     def _encode_input(
@@ -94,7 +108,15 @@ class FIVarNet(nn.Module):
         if crop_size is not None and image.shape[-1] < crop_size[1]:
             crop_size = (image.shape[-1], image.shape[-1])
         means, variances = self.norm_fn(image)
-        features = self.encoder(image, means=means, variances=variances)
+        # features = self.encoder(image, means=means, variances=variances)
+        if self.use_checkpoint:
+            features = checkpoint(
+                lambda img, m, v: self.encoder(img, means=m, variances=v),
+                image, means, variances,
+                use_reentrant=False
+            )
+        else:
+            features = self.encoder(image, means=means, variances=variances)
 
         return FeatureImage(
             features=features,
@@ -278,11 +300,25 @@ class IFVarNet(nn.Module):
         self.norm_fn = NormStats()
 
     def _decode_output(self, feature_image: FeatureImage) -> Tensor:
-        image = self.decoder(
-            self.decode_norm(feature_image.features),
-            means=feature_image.means,
-            variances=feature_image.variances,
-        )
+        # image = self.decoder(
+        #     self.decode_norm(feature_image.features),
+        #     means=feature_image.means,
+        #     variances=feature_image.variances,
+        # )
+        if self.use_checkpoint:
+            image = checkpoint(
+                lambda feats, m, v: self.decoder(feats, means=m, variances=v),
+                self.decode_norm(feature_image.features),
+                feature_image.means,
+                feature_image.variances,
+                use_reentrant=False
+            )
+        else:
+            image = self.decoder(
+                self.decode_norm(feature_image.features),
+                means=feature_image.means,
+                variances=feature_image.variances,
+            )
         return sens_expand(image, feature_image.sens_maps)
 
     def _encode_input(
@@ -298,7 +334,16 @@ class IFVarNet(nn.Module):
         if crop_size is not None and image.shape[-1] < crop_size[1]:
             crop_size = (image.shape[-1], image.shape[-1])
         means, variances = self.norm_fn(image)
-        features = self.encoder(image, means=means, variances=variances)
+        # features = self.encoder(image, means=means, variances=variances)
+
+        if self.use_checkpoint:
+            features = checkpoint(
+                lambda img, m, v: self.encoder(img, means=m, variances=v),
+                image, means, variances,
+                use_reentrant=False
+            )
+        else:
+            features = self.encoder(image, means=means, variances=variances)
 
         return FeatureImage(
             features=features,
@@ -343,10 +388,56 @@ class IFVarNet(nn.Module):
         )
         # feature_image = self.cascades(feature_image)
 
+        # # --- feature-space cascades (ckpt 지원) ---
+        # for block in self.cascades:
+        #     if self.use_checkpoint:
+        #         feature_image = checkpoint(block, feature_image) 
+        #     else:
+        #         feature_image = block(feature_image)
+
         # --- feature-space cascades (ckpt 지원) ---
         for block in self.cascades:
             if self.use_checkpoint:
-                feature_image = checkpoint(block, feature_image) 
+                # checkpoint only on the features and reassemble FeatureImage
+                feats      = feature_image.features
+                sens_maps  = feature_image.sens_maps
+                means      = feature_image.means
+                variances  = feature_image.variances
+                ref_ksp    = feature_image.ref_kspace
+                mask0      = feature_image.mask
+                crop_sz    = feature_image.crop_size
+
+                def _run_block(feats_in,
+                               _block=block,
+                               sens_maps=sens_maps,
+                               means=means,
+                               variances=variances,
+                               ref_ksp=ref_ksp,
+                               mask0=mask0,
+                               crop_sz=crop_sz):
+                    fi = FeatureImage(
+                        features   = feats_in,
+                        sens_maps  = sens_maps,
+                        crop_size  = crop_sz,
+                        means      = means,
+                        variances  = variances,
+                        ref_kspace = ref_ksp,
+                        mask       = mask0,
+                    )
+                    out = _block(fi)
+                    return out.features
+
+                # use_reentrant=False to suppress PyTorch warning
+                new_feats = checkpoint(_run_block, feats, use_reentrant=False)
+                feature_image = FeatureImage(
+                    features   = new_feats,
+                    sens_maps  = sens_maps,
+                    crop_size  = crop_sz,
+                    means      = means,
+                    variances  = variances,
+                    ref_kspace = ref_ksp,
+                    mask       = mask0,
+                )
             else:
                 feature_image = block(feature_image)
         
@@ -407,11 +498,26 @@ class FeatureVarNet_sh_w(nn.Module):
         self.norm_fn = NormStats()
 
     def _decode_output(self, feature_image: FeatureImage) -> Tensor:
-        image = self.decoder(
-            self.decode_norm(feature_image.features),
-            means=feature_image.means,
-            variances=feature_image.variances,
-        )
+        # image = self.decoder(
+        #     self.decode_norm(feature_image.features),
+        #     means=feature_image.means,
+        #     variances=feature_image.variances,
+        # )
+        if self.use_checkpoint:
+            image = checkpoint(
+                lambda feats, m, v: self.decoder(feats, means=m, variances=v),
+                self.decode_norm(feature_image.features),
+                feature_image.means,
+                feature_image.variances,
+                use_reentrant=False
+            )
+        else:
+            image = self.decoder(
+                self.decode_norm(feature_image.features),
+                means=feature_image.means,
+                variances=feature_image.variances,
+            )
+
         return sens_expand(image, feature_image.sens_maps)
 
     def _encode_input(
@@ -427,8 +533,17 @@ class FeatureVarNet_sh_w(nn.Module):
         if crop_size is not None and image.shape[-1] < crop_size[1]:
             crop_size = (image.shape[-1], image.shape[-1])
         means, variances = self.norm_fn(image)
-        features = self.encoder(image, means=means, variances=variances)
+        # features = self.encoder(image, means=means, variances=variances)
 
+        if self.use_checkpoint:
+            features = checkpoint(
+                lambda img, m, v: self.encoder(img, means=m, variances=v),
+                image, means, variances,
+                use_reentrant=False
+            )
+        else:
+            features = self.encoder(image, means=means, variances=variances)
+ 
         return FeatureImage(
             features=features,
             sens_maps=sens_maps,
@@ -458,7 +573,52 @@ class FeatureVarNet_sh_w(nn.Module):
         # feature_image = self.cascades(feature_image)
         # --- feature-space cascades (ckpt 지원) ---
         for block in self.cascades:
-            feature_image = checkpoint(block, feature_image) if self.use_checkpoint else block(feature_image)
+            if self.use_checkpoint:
+                # 1) 오직 features만 checkpoint 처리
+                feats      = feature_image.features
+                sens_maps  = feature_image.sens_maps
+                means      = feature_image.means
+                variances  = feature_image.variances
+                ref_ksp    = feature_image.ref_kspace
+                mask0      = feature_image.mask
+                crop_sz    = feature_image.crop_size
+
+                # 2) pure function 정의: Tensor → Tensor
+                def _run_block(feats_in,
+                               _block=block,
+                               sens_maps=sens_maps,
+                               means=means,
+                               variances=variances,
+                               ref_ksp=ref_ksp,
+                               mask0=mask0,
+                               crop_sz=crop_sz):
+                    fi = FeatureImage(
+                        features   = feats_in,
+                        sens_maps  = sens_maps,
+                        crop_size  = crop_sz,
+                        means      = means,
+                        variances  = variances,
+                        ref_kspace = ref_ksp,
+                        mask       = mask0,
+                    )
+                    out = _block(fi)
+                    return out.features
+
+                # 3) checkpoint 호출
+                new_feats = checkpoint(_run_block, feats, use_reentrant=False)
+
+                # 4) FeatureImage 재조립
+                feature_image = FeatureImage(
+                    features   = new_feats,
+                    sens_maps  = sens_maps,
+                    crop_size  = crop_sz,
+                    means      = means,
+                    variances  = variances,
+                    ref_kspace = ref_ksp,
+                    mask       = mask0,
+                )
+            else:
+                feature_image = block(feature_image)
 
         # Find last k-space
         kspace_pred = self._decode_output(feature_image)
@@ -518,11 +678,26 @@ class FeatureVarNet_n_sh_w(nn.Module):
         self.norm_fn = NormStats()
 
     def _decode_output(self, feature_image: FeatureImage) -> Tensor:
-        image = self.decoder(
-            self.decode_norm(feature_image.features),
-            means=feature_image.means,
-            variances=feature_image.variances,
-        )
+        # image = self.decoder(
+        #     self.decode_norm(feature_image.features),
+        #     means=feature_image.means,
+        #     variances=feature_image.variances,
+        # )
+        if self.use_checkpoint:
+            image = checkpoint(
+                lambda feats, m, v: self.decoder(feats, means=m, variances=v),
+                self.decode_norm(feature_image.features),
+                feature_image.means,
+                feature_image.variances,
+                use_reentrant=False
+            )
+        else:
+            image = self.decoder(
+                self.decode_norm(feature_image.features),
+                means=feature_image.means,
+                variances=feature_image.variances,
+            )
+
         return sens_expand(image, feature_image.sens_maps)
 
     def _encode_input(
@@ -538,7 +713,15 @@ class FeatureVarNet_n_sh_w(nn.Module):
         if crop_size is not None and image.shape[-1] < crop_size[1]:
             crop_size = (image.shape[-1], image.shape[-1])
         means, variances = self.norm_fn(image)
-        features = self.encoder(image, means=means, variances=variances)
+        # features = self.encoder(image, means=means, variances=variances)
+        if self.use_checkpoint:
+            features = checkpoint(
+                lambda img, m, v: self.encoder(img, means=m, variances=v),
+                image, means, variances,
+                use_reentrant=False
+            )
+        else:
+            features = self.encoder(image, means=means, variances=variances)
 
         return FeatureImage(
             features=features,
@@ -567,8 +750,54 @@ class FeatureVarNet_n_sh_w(nn.Module):
         )
         # Do DC in feature-space
         # feature_image = self.cascades(feature_image)
+        # for block in self.cascades:
+        #     feature_image = checkpoint(block, feature_image) if self.use_checkpoint else block(feature_image)
+        # — feature-space cascades (checkpoint 지원) —
         for block in self.cascades:
-            feature_image = checkpoint(block, feature_image) if self.use_checkpoint else block(feature_image)
+            if self.use_checkpoint:
+                # 1) features만 checkpoint 처리
+                feats     = feature_image.features
+                sens_maps = feature_image.sens_maps
+                means     = feature_image.means
+                vars_     = feature_image.variances
+                ref_ksp   = feature_image.ref_kspace
+                mask0     = feature_image.mask
+                crop_sz   = feature_image.crop_size
+
+                # 2) 순수 함수: Tensor → Tensor
+                def _run_block(feats_in,
+                               _block=block,
+                               sens_maps=sens_maps,
+                               means=means,
+                               vars_=vars_,
+                               ref_ksp=ref_ksp,
+                               mask0=mask0,
+                               crop_sz=crop_sz):
+                    fi = FeatureImage(
+                        features=feats_in,
+                        sens_maps=sens_maps,
+                        crop_size=crop_sz,
+                        means=means,
+                        variances=vars_,
+                        ref_kspace=ref_ksp,
+                        mask=mask0,
+                    )
+                    out = _block(fi)
+                    return out.features
+
+                # 3) checkpoint 호출 및 FeatureImage 재조립
+                new_feats = checkpoint(_run_block, feats, use_reentrant=False)
+                feature_image = FeatureImage(
+                    features=new_feats,
+                    sens_maps=sens_maps,
+                    crop_size=crop_sz,
+                    means=means,
+                    variances=vars_,
+                    ref_kspace=ref_ksp,
+                    mask=mask0,
+                )
+            else:
+                feature_image = block(feature_image)
 
         # Find last k-space
         kspace_pred = self._decode_output(feature_image)
@@ -629,11 +858,26 @@ class AttentionFeatureVarNet_n_sh_w(nn.Module):
         self.norm_fn = NormStats()
 
     def _decode_output(self, feature_image: FeatureImage) -> Tensor:
-        image = self.decoder(
-            self.decode_norm(feature_image.features),
-            means=feature_image.means,
-            variances=feature_image.variances,
-        )
+        # image = self.decoder(
+        #     self.decode_norm(feature_image.features),
+        #     means=feature_image.means,
+        #     variances=feature_image.variances,
+        # )
+        if self.use_checkpoint:
+            image = checkpoint(
+                lambda feats, m, v: self.decoder(feats, means=m, variances=v),
+                self.decode_norm(feature_image.features),
+                feature_image.means,
+                feature_image.variances,
+                use_reentrant=False
+            )
+        else:
+            image = self.decoder(
+                self.decode_norm(feature_image.features),
+                means=feature_image.means,
+                variances=feature_image.variances,
+            )
+
         return sens_expand(image, feature_image.sens_maps)
 
     def _encode_input(
@@ -649,7 +893,15 @@ class AttentionFeatureVarNet_n_sh_w(nn.Module):
         if crop_size is not None and image.shape[-1] < crop_size[1]:
             crop_size = (image.shape[-1], image.shape[-1])
         means, variances = self.norm_fn(image)
-        features = self.encoder(image, means=means, variances=variances)
+        # features = self.encoder(image, means=means, variances=variances)
+        if self.use_checkpoint:
+            features = checkpoint(
+                lambda img, m, v: self.encoder(img, means=m, variances=v),
+                image, means, variances,
+                use_reentrant=False
+            )
+        else:
+            features = self.encoder(image, means=means, variances=variances)
 
         return FeatureImage(
             features=features,
@@ -679,9 +931,55 @@ class AttentionFeatureVarNet_n_sh_w(nn.Module):
         # Do DC in feature-space
         # feature_image = self.cascades(feature_image)
 
+        # for block in self.cascades:
+        #     feature_image = checkpoint(block, feature_image) if self.use_checkpoint else block(feature_image)
+        # — feature-space cascades (checkpoint 지원) —
         for block in self.cascades:
-            feature_image = checkpoint(block, feature_image) if self.use_checkpoint else block(feature_image)
+            if self.use_checkpoint:
+                # 1) features만 checkpoint 처리
+                feats     = feature_image.features
+                sens_maps = feature_image.sens_maps
+                crop_sz   = feature_image.crop_size
+                means     = feature_image.means
+                vars_     = feature_image.variances
+                ref_ksp   = feature_image.ref_kspace
+                mask0     = feature_image.mask
 
+                # 2) 순수 함수로 정의: Tensor → Tensor
+                def _run_block(feats_in,
+                               _block=block,
+                               sens_maps=sens_maps,
+                               crop_sz=crop_sz,
+                               means=means,
+                               vars_=vars_,
+                               ref_ksp=ref_ksp,
+                               mask0=mask0):
+                    fi = FeatureImage(
+                        features   = feats_in,
+                        sens_maps  = sens_maps,
+                        crop_size  = crop_sz,
+                        means      = means,
+                        variances  = vars_,
+                        ref_kspace = ref_ksp,
+                        mask       = mask0,
+                    )
+                    out = _block(fi)
+                    return out.features
+
+                # 3) checkpoint 호출 및 FeatureImage 재조립
+                new_feats = checkpoint(_run_block, feats, use_reentrant=False)
+                feature_image = FeatureImage(
+                    features   = new_feats,
+                    sens_maps  = sens_maps,
+                    crop_size  = crop_sz,
+                    means      = means,
+                    variances  = vars_,
+                    ref_kspace = ref_ksp,
+                    mask       = mask0,
+                )
+            else:
+                feature_image = block(feature_image)
+ 
         # Find last k-space
         kspace_pred = self._decode_output(feature_image)
         # Return Final Image

@@ -17,7 +17,11 @@ def parse_args():
     parser.add_argument("--mask_only",     type=str, required=False)
     parser.add_argument("--region_weight", type=str, required=False)
     # 우리가 실험할 항목
-    parser.add_argument("--scheduler")                # Cosine…, StepLR …
+    parser.add_argument("--scheduler")                # Cosine…, StepLR …+    
+    # 모델 그룹 선택 (Hydra: model=...)
+    parser.add_argument("--model",         type=str, required=False,
+                        help="which model config to use (e.g. fivarnet, ifvarnet, featurevarnet_sh_w, ...)")
+
     # Hydra 기본 config-name도 뽑아두기
     parser.add_argument("--config-name",   type=str, dest="config_name", required=False)
     return parser.parse_known_args()
@@ -67,6 +71,11 @@ if args.amp is not None:
     # Hydra group 'training' 내부의 amp 옵션을 override
     cmd.append(f"training.amp={args.amp}")
 
+# ────────────────── model override ──────────────────
+if args.model:
+    # Hydra 모델 그룹을 override
+    cmd.append(f"model={args.model}")
+ 
 # 4) 나머지 unknown 은 그대로 (다른 Hydra 플래그 있으면 받기)
 for arg in unknown:
     if arg.startswith('--'):

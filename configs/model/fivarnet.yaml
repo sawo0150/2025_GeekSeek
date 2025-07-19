@@ -2,7 +2,7 @@
 
 _target_: utils.model.feature_varnet.FIVarNet   # 사용할 모델 클래스의 전체 경로
 
-num_cascades: 10        # Variational cascade 반복 횟수. 복원(iteration) 깊이를 결정 (계산량↑/표현력↑)
+num_cascades: 6        # Variational cascade 반복 횟수. 복원(iteration) 깊이를 결정 (계산량↑/표현력↑)
 chans: 9              # feature‐space U-Net 및 Attention 모듈에서 사용하는 채널(필터) 수
 pools: 4               # feature‐space U-Net의 다운샘플/업샘플 단계 수
 sens_chans: 8          # sensitivity estimation U-Net(민감도 맵 추정망)의 첫 레이어 채널 수
@@ -24,5 +24,8 @@ kspace_mult_factor: 1e6 # k-space 값을 학습 중 수치 안정화를 위해 �
 
 # (4,9,8) : checkpointing O : 6597
 # (5,9,8) : checkpointing O : 6740
-# (6,9,8) : checkpointing O : 6887
+# (6,9,8) : checkpointing O : 6903
+
+# ---- 여기까지 최선...?
+# (7,9,8) : checkpointing O : 7048
 # (10,9,8) : checkpointing O : 7458

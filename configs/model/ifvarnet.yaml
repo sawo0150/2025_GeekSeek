@@ -1,5 +1,5 @@
 _target_: utils.model.feature_varnet.IFVarNet
-num_cascades: 10
+num_cascades: 5
 chans: 9
 pools: 4
 sens_chans: 8
@@ -7,4 +7,14 @@ sens_pools: 4
 acceleration: 4
 mask_center: true
 kspace_mult_factor: 1e6
-use_checkpoint: true   # 메모리 절약용
+
+
+
+# (4,9,8) : checkpointing O : 6853
+# (5,9,8) : checkpointing O : 7034
+
+# ---- 여기까지 최선...?
+# (6,9,8) : checkpointing O : 7233
+
+# (7,9,8) : checkpointing O : 7418
+# (10,9,8) : checkpointing O : 7991 -> 7971

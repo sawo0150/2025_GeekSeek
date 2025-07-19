@@ -1,5 +1,5 @@
 amp:           false        # mixed-precision
-checkpointing: false        # gradient_checkpoint
+checkpointing: true        # gradient_checkpoint
 accum_steps:   2            # gradient_accumulation (1이면 이 기능 끄는거임.)
 # (cascade, chans, sens_chans)
 # deepspeed false (18,18,8), checkpoint O : 7000, 11056 (max_memory_allocated, max max_memory_reserved MB)
