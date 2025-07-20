@@ -1,0 +1,48 @@
+amp:           true        # mixed-precision
+checkpointing: false        # gradient_checkpoint
+accum_steps:   10            # gradient_accumulation (1이면 이 기능 끄는거임.)
+# (cascade, chans, sens_chans)
+# deepspeed false (18,18,8), checkpoint O : 7000, 11056 (max_memory_allocated, max max_memory_reserved MB)
+# deepspeed true  (18,18,8), checkpoint O : 8392, 11024 (stage 1)
+# deepspeed true  (18,18,8), checkpoint O : 8381, 11034 (stage 2)
+# deepspeed true  (18,18,8), checkpoint O : 8385, 10984 (stage 3)
+
+deepspeed:
+  enable:       false        # ← 스위치 - true or false
+  config:                     # DeepSpeed JSON을 그대로 삽입
+    train_micro_batch_size_per_gpu: ${batch_size}
+    # └─ GPU 1장 당 forward/backward 1회 실행 시 처리할 샘플 수
+
+    # train_batch_size: 
+    #   global batch (= micro * accum * world_size)을 직접 지정하고 싶다면 사용.
+    #   지정하지 않으면 auto-infer 됩니다 :contentReference[oaicite:9]{index=9}
+
+    dist_init_required : False # 분산 초기화 (싱글 gpu에는 쓸모 X)
+
+    optimizer:
+      type: Adam   # CPU 오프로딩 전용 Adam
+      params:
+        lr: ${lr}                                # 기존 lr 그대로 사용
+        betas: [0.9, 0.999]
+        eps: 1e-8
+        weight_decay: 0
+
+    zero_optimization:
+      stage: 1              # ▶ ZeRO Stage 선택:
+                            #    1: optimizer state만 파티셔닝  
+                            #    2: optimizer + gradient 파티셔닝  
+                            #    3: optimizer + gradient + parameter 파티셔닝
+      offload_optimizer:    # ▶ optimizer state를 GPU가 아닌 CPU에 보관
+        device: cpu         #    메모리 아끼기 최우선: 1080에 유리
+
+    fp16:
+      enabled: false       # ▶ Mixed-precision on/off.
+                           # GTX1080은 FP16 속도가 떨어져 FP32 권장
+    # ───────── WarmupCosineLR 스케줄러 설정 ─────────
+    scheduler:
+      type: WarmupCosineLR
+      params:
+        warmup_min_ratio: 0.001          # 시작 lr = base_lr * ratio
+        cos_min_ratio:    0.1          # 최종 lr = base_lr * ratio
+        warmup_num_steps: null         # 코드에서 주입
+        total_num_steps:  null         # 코드에서 주입

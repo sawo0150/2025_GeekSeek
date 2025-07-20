@@ -1,0 +1,11 @@
+data_path_train: C:/Users/user/Videos/.fmri/Data/train/
+data_path_val:   C:/Users/user/Videos/.fmri/Data/val/
+data_path_eval:  C:/Users/user/Videos/.fmri/Data/leaderboard/
+PROJECT_ROOT: C:/Users/user/Videos/.fmri/
+repo_ROOT:    C:/Users/user/Videos/.fmri/2025_GeekSeek/
+
+mask_thresholds:
+  brain_x4: 5e-5
+  brain_x8: 5e-5
+  knee_x4:  2e-5
+  knee_x8:  2e-5
