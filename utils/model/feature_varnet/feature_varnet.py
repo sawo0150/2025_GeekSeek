@@ -117,7 +117,6 @@ class FIVarNet(nn.Module):
             )
         else:
             features = self.encoder(image, means=means, variances=variances)
-
         return FeatureImage(
             features=features,
             sens_maps=sens_maps,
