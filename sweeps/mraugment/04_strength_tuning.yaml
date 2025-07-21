@@ -1,25 +1,40 @@
+# sweeps/mraugment/04_strength_tuning.yaml
+
 # 5단계: 전체 강도 튜닝
-program: sweeps/mraugment/train_entry.py
+
+# 탐색 방법: 베이즈 최적화
 method: bayes
+
+# 최적화 목표
 metric:
   name: val_ssim
   goal: maximize
+
+# W&B가 실행할 중간 스크립트
+program: sweeps/mraugment/train_entry.py
+
+# sweep 할 파라미터들
 parameters:
-  config-name:
-    value: sweeping_default
+  # config-name은 아래 command에서 고정되므로 여기서 제외합니다.
     
-  # 3,4 단계에서 찾은 최적의 설정으로 고정 (예: epoch, ramp)
+  # 3,4 단계에서 찾은 최적의 설정으로 고정
   aug_schedule_mode:
     value: 'epoch'
   aug_schedule_type:
     value: 'ramp' 
     
+  # 이번 sweep의 목표인 aug_strength
   aug_strength:
     distribution: uniform
     min: 0.3
     max: 0.9
 
-
-     # +++ 이 부분을 추가하여 maskDuplicate 기능을 비활성화합니다 +++
-  maskDuplicate:
-    value: none
+# ✅ 실행할 명령어를 2단계 구조에 맞게 직접 구성합니다.
+command:
+  - ${env}
+  - python
+  - ${program}
+  # (1) Hydra가 사용할 기본 설정 파일을 여기서 고정합니다.
+  - "--config-name=sweeping_default"
+  # (2) parameters의 모든 항목이 "--key=value" 형태로 변환되어 여기에 삽입됩니다.
+  - ${args}

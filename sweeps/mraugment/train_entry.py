@@ -3,13 +3,16 @@
 import argparse, subprocess, sys, os
 
 def parse_args():
+    """
+    W&B의 command 섹션으로부터 --key=value 형태의 인수를 받도록 정의합니다.
+    """
     parser = argparse.ArgumentParser()
 
     # --- Hydra 기본 인자 ---
-    parser.add_argument("--config-name", type=str, dest="config_name", required=False)
+    parser.add_argument("--config-name", type=str, required=False)
 
     # --- Augmentation 전체 제어 ---
-    parser.add_argument("--aug", type=str, required=False, help="e.g., 'none' or 'mraugment'")
+    parser.add_argument("--aug", type=str, required=False)
 
     # --- MRAugmenter 스케줄 관련 인자 ---
     parser.add_argument("--aug_schedule_mode", type=str, required=False)
@@ -27,24 +30,23 @@ def parse_args():
 
     # --- 기타 학습 관련 인자 ---
     parser.add_argument("--epoch", type=int, required=False)
-    
-    # +++ 수정된 부분 시작 +++
-    # maskDuplicate 기능을 제어하기 위한 인자 추가
-    parser.add_argument("--maskDuplicate", type=str, required=False, help="e.g., 'none' or 'acc4_acc8'")
-    # +++ 수정된 부분 끝 +++
+    parser.add_argument("--maskDuplicate", type=str, required=False)
 
     return parser.parse_known_args()
 
+# 1. W&B agent의 `command:`로부터 인수를 파싱합니다.
 args, unknown = parse_args()
 
-# 기본 실행 명령어
+# 2. 최종적으로 Hydra(main.py)에 전달할 명령어를 새로 생성합니다.
 cmd = ["python", "main.py"]
 
-# 1) --config-name 은 Hydra 쪽으로
+# 3. 파싱된 인수를 Hydra가 이해하는 형식으로 "번역" 및 "재구성"합니다.
+
+# (A) Hydra 특별 명령어(--config-name)는 "--"를 유지합니다.
 if args.config_name:
     cmd.append(f"--config-name={args.config_name}")
 
-# 2) Augmentation 관련 파라미터 추가
+# (B) 값 오버라이드는 "--"를 제거하고, 필요한 경우 키 이름을 변경합니다.
 if args.aug is not None:
     cmd.append(f"aug={args.aug}")
 if args.aug_schedule_mode is not None:
@@ -56,7 +58,6 @@ if args.aug_exp_decay is not None:
 if args.aug_strength is not None:
     cmd.append(f"aug.aug_strength={args.aug_strength}")
 
-# 3) Weight Dict 관련 파라미터 추가
 if args.wd_fliph is not None:
     cmd.append(f"aug.weight_dict.fliph={args.wd_fliph}")
 if args.wd_flipv is not None:
@@ -70,18 +71,18 @@ if args.wd_shift is not None:
 if args.wd_shear is not None:
     cmd.append(f"aug.weight_dict.shear={args.wd_shear}")
 
-# 4) 기타 파라미터
 if args.epoch is not None:
-    cmd.append(f"num_epochs={args.epoch}")
-
-# +++ 수정된 부분 시작 +++
-# 5) maskDuplicate 파라미터 추가
+    cmd.append(f"num_epochs={args.epoch}") # 'epoch' -> 'num_epochs'로 번역
 if args.maskDuplicate is not None:
     cmd.append(f"maskDuplicate={args.maskDuplicate}")
-# +++ 수정된 부분 끝 +++
 
+# (C) 혹시 모를 나머지 인수를 안전하게 처리합니다.
+for arg in unknown:
+    if arg.startswith('--') and '=' in arg:
+        cmd.append(arg[2:])
+    else:
+        cmd.append(arg)
 
-# 6) 나머지 unknown 은 그대로 전달 (다른 Hydra 플래그용)
-cmd.extend(unknown)
-
+# 4. 최종 생성된 명령어를 출력하고 실행합니다.
+print(f"Executing command: {' '.join(cmd)}")
 sys.exit(subprocess.call(cmd))
