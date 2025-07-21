@@ -1,6 +1,6 @@
-amp:           false        # mixed-precision
+amp:           true        # mixed-precision
 checkpointing: false        # gradient_checkpoint
-accum_steps:   2            # gradient_accumulation (1이면 이 기능 끄는거임.)
+accum_steps:   3            # gradient_accumulation (1이면 이 기능 끄는거임.)
 
 
 deepspeed:
