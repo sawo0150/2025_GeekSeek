@@ -31,9 +31,12 @@ class FIVarNet(nn.Module):
         mask_center: bool = True,
         image_conv_cascades: Optional[List[int]] = None,
         kspace_mult_factor: float = 1e6,
+        crop_size: Optional[Tuple[int, int]] = (450, 450),   # ★ 새 파라미터
         use_checkpoint: bool = False,              # ★ NEW 토글 파라미터
     ):
         super().__init__()
+
+        self.crop_size = crop_size
         if image_conv_cascades is None:
             image_conv_cascades = [ind for ind in range(num_cascades) if ind % 3 == 0]
 
@@ -104,9 +107,16 @@ class FIVarNet(nn.Module):
     ) -> FeatureImage:
         sens_maps = self.sens_net(masked_kspace, mask, num_low_frequencies)
         image = sens_reduce(masked_kspace, sens_maps)
-        # detect FLAIR 203
-        if crop_size is not None and image.shape[-1] < crop_size[1]:
-            crop_size = (image.shape[-1], image.shape[-1])
+        # # detect FLAIR 203
+        # if crop_size is not None and image.shape[-1] < crop_size[1]:
+        #     crop_size = (image.shape[-1], image.shape[-1])
+
+        # crop 크기(H,W) 각각을 데이터 실제 크기와 비교해 min 값으로 맞춤
+        if crop_size is not None:
+            h, w = image.shape[-2:]
+            crop_size = (min(h, crop_size[0]), min(w, crop_size[1]))
+            # print("crop_size : ", crop_size, "image.shape : ",image.shape)
+
         means, variances = self.norm_fn(image)
         # features = self.encoder(image, means=means, variances=variances)
         if self.use_checkpoint:
@@ -132,14 +142,13 @@ class FIVarNet(nn.Module):
         masked_kspace: Tensor,
         mask: Tensor,
         num_low_frequencies: Optional[int] = None,
-        crop_size: Optional[Tuple[int, int]] = None,
     ) -> Tensor:
         masked_kspace = masked_kspace * self.kspace_mult_factor
         # Encode to features and get sensitivities
         feature_image = self._encode_input(
             masked_kspace=masked_kspace,
             mask=mask,
-            crop_size=crop_size,
+            crop_size=self.crop_size,
             num_low_frequencies=num_low_frequencies,
         )
         # Do DC in feature-space
@@ -258,6 +267,7 @@ class IFVarNet(nn.Module):
         mask_center: bool = True,
         image_conv_cascades: Optional[List[int]] = None,
         kspace_mult_factor: float = 1e6,
+        crop_size: Optional[Tuple[int, int]] = (450, 450),
         use_checkpoint: bool = False,          # ★ NEW
     ):
         super().__init__()
@@ -267,6 +277,7 @@ class IFVarNet(nn.Module):
         self.image_conv_cascades = image_conv_cascades
         self.kspace_mult_factor = kspace_mult_factor
         self.use_checkpoint     = use_checkpoint   # ★ NEW
+        self.crop_size          = crop_size
         self.sens_net = SensitivityModel(
             chans=sens_chans,
             num_pools=sens_pools,
@@ -329,9 +340,14 @@ class IFVarNet(nn.Module):
         crop_size: Optional[Tuple[int, int]],
     ) -> FeatureImage:
         image = sens_reduce(masked_kspace, sens_maps)
-        # detect FLAIR 203
-        if crop_size is not None and image.shape[-1] < crop_size[1]:
-            crop_size = (image.shape[-1], image.shape[-1])
+        # # detect FLAIR 203
+        # if crop_size is not None and image.shape[-1] < crop_size[1]:
+        #     crop_size = (image.shape[-1], image.shape[-1])
+
+        if crop_size is not None:
+            h, w = image.shape[-2:]
+            crop_size = (min(h, crop_size[0]), min(w, crop_size[1]))
+
         means, variances = self.norm_fn(image)
         # features = self.encoder(image, means=means, variances=variances)
 
@@ -359,7 +375,6 @@ class IFVarNet(nn.Module):
         masked_kspace: Tensor,
         mask: Tensor,
         num_low_frequencies: Optional[int] = None,
-        crop_size: Optional[Tuple[int, int]] = None,
     ) -> Tensor:
 
         masked_kspace = masked_kspace * self.kspace_mult_factor
@@ -383,7 +398,7 @@ class IFVarNet(nn.Module):
             ref_kspace=masked_kspace,
             sens_maps=sens_maps,
             mask=mask,
-            crop_size=crop_size,
+            crop_size=self.crop_size,
         )
         # feature_image = self.cascades(feature_image)
 
@@ -462,6 +477,7 @@ class FeatureVarNet_sh_w(nn.Module):
         mask_center: bool = True,
         image_conv_cascades: Optional[List[int]] = None,
         kspace_mult_factor: float = 1e6,
+        crop_size: Optional[Tuple[int, int]] = (450, 450),
         use_checkpoint: bool = False,              # ★ NEW
     ):
         super().__init__()
@@ -471,6 +487,7 @@ class FeatureVarNet_sh_w(nn.Module):
         self.image_conv_cascades = image_conv_cascades
         self.kspace_mult_factor = kspace_mult_factor
         self.use_checkpoint     = use_checkpoint   # ★ NEW
+        self.crop_size          = crop_size
         self.sens_net = SensitivityModel(
             chans=sens_chans,
             num_pools=sens_pools,
@@ -529,8 +546,13 @@ class FeatureVarNet_sh_w(nn.Module):
         sens_maps = self.sens_net(masked_kspace, mask, num_low_frequencies)
         image = sens_reduce(masked_kspace, sens_maps)
         # detect FLAIR 203
-        if crop_size is not None and image.shape[-1] < crop_size[1]:
-            crop_size = (image.shape[-1], image.shape[-1])
+        # if crop_size is not None and image.shape[-1] < crop_size[1]:
+        #     crop_size = (image.shape[-1], image.shape[-1])
+
+        if crop_size is not None:
+            h, w = image.shape[-2:]
+            crop_size = (min(h, crop_size[0]), min(w, crop_size[1]))
+
         means, variances = self.norm_fn(image)
         # features = self.encoder(image, means=means, variances=variances)
 
@@ -558,14 +580,13 @@ class FeatureVarNet_sh_w(nn.Module):
         masked_kspace: Tensor,
         mask: Tensor,
         num_low_frequencies: Optional[int] = None,
-        crop_size: Optional[Tuple[int, int]] = None,
     ) -> Tensor:
         masked_kspace = masked_kspace * self.kspace_mult_factor
         # Encode to features and get sensitivities
         feature_image = self._encode_input(
             masked_kspace=masked_kspace,
             mask=mask,
-            crop_size=crop_size,
+            crop_size=self.crop_size,
             num_low_frequencies=num_low_frequencies,
         )
         # Do DC in feature-space
@@ -642,6 +663,7 @@ class FeatureVarNet_n_sh_w(nn.Module):
         mask_center: bool = True,
         image_conv_cascades: Optional[List[int]] = None,
         kspace_mult_factor: float = 1e6,
+        crop_size: Optional[Tuple[int, int]] = (450, 450),
         use_checkpoint: bool = False,
     ):
         super().__init__()
@@ -651,6 +673,7 @@ class FeatureVarNet_n_sh_w(nn.Module):
         self.image_conv_cascades = image_conv_cascades
         self.kspace_mult_factor = kspace_mult_factor
         self.use_checkpoint     = use_checkpoint
+        self.crop_size          = crop_size
         self.sens_net = SensitivityModel(
             chans=sens_chans,
             num_pools=sens_pools,
@@ -709,8 +732,13 @@ class FeatureVarNet_n_sh_w(nn.Module):
         sens_maps = self.sens_net(masked_kspace, mask, num_low_frequencies)
         image = sens_reduce(masked_kspace, sens_maps)
         # detect FLAIR 203
-        if crop_size is not None and image.shape[-1] < crop_size[1]:
-            crop_size = (image.shape[-1], image.shape[-1])
+        # if crop_size is not None and image.shape[-1] < crop_size[1]:
+        #     crop_size = (image.shape[-1], image.shape[-1])
+
+        if crop_size is not None:
+            h, w = image.shape[-2:]
+            crop_size = (min(h, crop_size[0]), min(w, crop_size[1]))
+
         means, variances = self.norm_fn(image)
         # features = self.encoder(image, means=means, variances=variances)
         if self.use_checkpoint:
@@ -737,14 +765,13 @@ class FeatureVarNet_n_sh_w(nn.Module):
         masked_kspace: Tensor,
         mask: Tensor,
         num_low_frequencies: Optional[int] = None,
-        crop_size: Optional[Tuple[int, int]] = None,
     ) -> Tensor:
         masked_kspace = masked_kspace * self.kspace_mult_factor
         # Encode to features and get sensitivities
         feature_image = self._encode_input(
             masked_kspace=masked_kspace,
             mask=mask,
-            crop_size=crop_size,
+            crop_size=self.crop_size,
             num_low_frequencies=num_low_frequencies,
         )
         # Do DC in feature-space
@@ -820,6 +847,7 @@ class AttentionFeatureVarNet_n_sh_w(nn.Module):
         mask_center: bool = True,
         image_conv_cascades: Optional[List[int]] = None,
         kspace_mult_factor: float = 1e6,
+        crop_size: Optional[Tuple[int, int]] = (450, 450),   # ★ 새 파라미터
         use_checkpoint: bool = False,
     ):
         super().__init__()
@@ -829,6 +857,7 @@ class AttentionFeatureVarNet_n_sh_w(nn.Module):
         self.image_conv_cascades = image_conv_cascades
         self.kspace_mult_factor = kspace_mult_factor
         self.use_checkpoint     = use_checkpoint
+        self.crop_size = crop_size
         self.sens_net = SensitivityModel(
             chans=sens_chans,
             num_pools=sens_pools,
@@ -888,9 +917,15 @@ class AttentionFeatureVarNet_n_sh_w(nn.Module):
     ) -> FeatureImage:
         sens_maps = self.sens_net(masked_kspace, mask, num_low_frequencies)
         image = sens_reduce(masked_kspace, sens_maps)
-        # detect FLAIR 203
-        if crop_size is not None and image.shape[-1] < crop_size[1]:
-            crop_size = (image.shape[-1], image.shape[-1])
+        # # detect FLAIR 203
+        # if crop_size is not None and image.shape[-1] < crop_size[1]:
+        #     crop_size = (image.shape[-1], image.shape[-1])
+
+        # crop 크기(H,W) 각각을 데이터 실제 크기와 비교해 min 값으로 맞춤
+        if crop_size is not None:
+            h, w = image.shape[-2:]
+            crop_size = (min(h, crop_size[0]), min(w, crop_size[1]))
+
         means, variances = self.norm_fn(image)
         # features = self.encoder(image, means=means, variances=variances)
         if self.use_checkpoint:
@@ -917,14 +952,13 @@ class AttentionFeatureVarNet_n_sh_w(nn.Module):
         masked_kspace: Tensor,
         mask: Tensor,
         num_low_frequencies: Optional[int] = None,
-        crop_size: Optional[Tuple[int, int]] = None,
     ) -> Tensor:
         masked_kspace = masked_kspace * self.kspace_mult_factor
         # Encode to features and get sensitivities
         feature_image = self._encode_input(
             masked_kspace=masked_kspace,
             mask=mask,
-            crop_size=crop_size,
+            crop_size=self.crop_size,
             num_low_frequencies=num_low_frequencies,
         )
         # Do DC in feature-space

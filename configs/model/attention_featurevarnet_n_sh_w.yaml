@@ -9,6 +9,10 @@ mask_center: true
 kspace_mult_factor: 1e6
 
 
+# 전역 center-crop 크기(H,W).  null ⇒ crop 없음
+crop_size: null
+# crop_size: [450, 450]
+
 
 # (6,9,8) : checkpointing O : 6846
 # (7,9,8) : checkpointing O : 6982

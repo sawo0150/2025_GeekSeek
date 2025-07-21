@@ -7,9 +7,25 @@ sens_pools: 4
 mask_center: true
 kspace_mult_factor: 1e6
 
+# 전역 center-crop 크기(H,W).  null ⇒ crop 없음
+crop_size: null
+# crop_size: [450, 450]
+
 
 # (7,9,8) : checkpointing O : 6807
 # (8,9,8) : checkpointing O : 6948
 # ---- 여기까지 최선...?
 
 # (10,9,8) : checkpointing O : 7215
+
+
+# (crop 켰을때 - 450, 450)
+
+# (6,9,8) : checkpointing O : 6549
+# (7,9,8) : checkpointing O : 6744
+# (8,9,8) : checkpointing O : 6930
+
+# (9,9,8) : checkpointing O : 7113
+
+# ---- 여기까지 최선...?
+# (10,9,8) : checkpointing O : 7308
