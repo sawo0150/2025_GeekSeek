@@ -1,7 +1,4 @@
-# coding=utf-8
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+
 
 import copy
 import logging
@@ -12,11 +9,16 @@ from os.path import join as pjoin
 import torch
 import torch.nn as nn
 import numpy as np
+from torch.nn.init import trunc_normal_
 
-from torch.nn import CrossEntropyLoss, Dropout, Softmax, Linear, Conv2d, LayerNorm
 from torch.nn.modules.utils import _pair
 from scipy import ndimage
-from .mamba_sys import VSSM
+
+from .layers.patch import PatchEmbed2D, PatchMerging2D, PatchExpand, FinalPatchExpand_X4
+from .layers.data_consistency import DataConsistency
+from .mamba_block import VSSLayer
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -103,50 +105,60 @@ class VSSM_unrolled(nn.Module):
         return x
 
 
-    def flops(self, shape=(2, 256, 256)):
-        # shape = self.__input_shape__[1:]
-        supported_ops={
-            "aten::silu": None, # as relu is in _IGNORED_OPS
-            "aten::neg": None, # as relu is in _IGNORED_OPS
-            "aten::exp": None, # as relu is in _IGNORED_OPS
-            "aten::flip": None, # as permute is in _IGNORED_OPS
-            "prim::PythonOp.SelectiveScanFn": selective_scan_flop_jit, # latter
-        }
-
-        model = copy.deepcopy(self)
-        model.cuda().eval()
-
-        input1 = torch.randn((1, 2, 256, 256), device=next(model.parameters()).device)
-        input2 = torch.randn((1, 5, 256, 256), device=next(model.parameters()).device)
-        input3 = torch.randn((1, 1, 256, 256), device=next(model.parameters()).device)
-
-        params = parameter_count(model)[""]
-        Gflops, unsupported = flop_count(model=model, inputs=(input1, input2, input3), supported_ops=supported_ops)
-
-        del model, input1, input2, input3
-        return sum(Gflops.values()) * 1e9
-        return f"params {params} GFLOPs {sum(Gflops.values())}"
-
-
 
 
 
 class MambaUnrolled(nn.Module):
-    def __init__(self, config, patch_size=2, num_classes=2, zero_head=False, vis=False):
+    # def __init__(self, config, patch_size=2, num_classes=2, zero_head=False, vis=False):
+    def __init__(
+        self,
+        patch_size: int = 2,
+        in_chans: int = 2,
+        num_classes: int = 2,
+        depths: list = None,
+        dims: list = None,
+        d_state: int = 16,
+        drop_rate: float = 0.,
+        attn_drop_rate: float = 0.,
+        drop_path_rate: float = 0.1,
+        patch_norm: bool = True,
+        use_checkpoint: bool = False,
+        zero_head: bool = False,
+        vis: bool = False,
+    ):
         super(MambaUnrolled, self).__init__()
+        # self.num_classes = num_classes
+        # self.zero_head = zero_head
+        # self.config = config
+
+        # self.mamba_unet =  VSSM_unrolled(
+        #                         patch_size=patch_size,
+        #                         num_classes=self.num_classes,
+        #                         mlp_ratio=config.MODEL.SWIN.MLP_RATIO,
+        #                         drop_rate=config.MODEL.DROP_RATE,
+        #                         drop_path_rate=config.MODEL.DROP_PATH_RATE,
+        #                         patch_norm=config.MODEL.SWIN.PATCH_NORM,
+        #                         use_checkpoint=config.TRAIN.USE_CHECKPOINT)
+        # 기본값 설정
+        depths = depths if depths is not None else [2, 2, 2, 2, 2, 2]
+        dims   = dims   if dims   is not None else [128, 128, 128, 128]
+
         self.num_classes = num_classes
-        self.zero_head = zero_head
-        self.config = config
+        self.zero_head   = zero_head
 
-        self.mamba_unet =  VSSM_unrolled(
-                                patch_size=patch_size,
-                                num_classes=self.num_classes,
-                                mlp_ratio=config.MODEL.SWIN.MLP_RATIO,
-                                drop_rate=config.MODEL.DROP_RATE,
-                                drop_path_rate=config.MODEL.DROP_PATH_RATE,
-                                patch_norm=config.MODEL.SWIN.PATCH_NORM,
-                                use_checkpoint=config.TRAIN.USE_CHECKPOINT)
-
+        self.mamba_unet = VSSM_unrolled(
+            patch_size        = patch_size,
+            in_chans          = in_chans,
+            num_classes       = num_classes,
+            depths            = depths,
+            dims              = dims,
+            d_state           = d_state,
+            drop_rate         = drop_rate,
+            attn_drop_rate    = attn_drop_rate,
+            drop_path_rate    = drop_path_rate,
+            patch_norm        = patch_norm,
+            use_checkpoint    = use_checkpoint,
+        )
     def forward(self, x, us_mask, coil_map):
         # if x.size()[1] == 1:
         #     x = x.repeat(1,3,1,1)

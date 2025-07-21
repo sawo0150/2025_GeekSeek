@@ -18,3 +18,5 @@ adabelief-pytorch
 pytorch-msssim
 pandas
 mpi4py
+mambapy
+state-spaces-mamba

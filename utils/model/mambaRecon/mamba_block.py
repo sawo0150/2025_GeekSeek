@@ -1,4 +1,24 @@
 
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.utils.checkpoint as checkpoint
+
+import math, copy
+from functools import partial
+from typing import Optional, Callable
+
+from .layers.patch import PatchEmbed2D, PatchMerging2D, PatchExpand, FinalPatchExpand_X4
+from .common import DropPath
+
+from einops import rearrange, repeat
+
+from torch.nn.init import trunc_normal_        # torch ≥1.9 에 기본 포함 :contentReference[oaicite:2]{index=2}
+
+
+
+from .selective_scan_interface import selective_scan_fn
+
 class VSSM(nn.Module):
     def __init__(self, patch_size=4, in_chans=2, num_classes=2, depths=[2, 2, 2, 2], 
                  dims=[96, 192, 384, 768], d_state=16, drop_rate=0., attn_drop_rate=0., drop_path_rate=0.1,
@@ -129,29 +149,6 @@ class VSSM(nn.Module):
         x = self.forward_up_features(x,x_downsample)
         x = self.up_x4(x, self.patch_size)
         return x
-
-
-    def flops(self, shape=(3, 224, 224)):
-        # shape = self.__input_shape__[1:]
-        supported_ops={
-            "aten::silu": None, # as relu is in _IGNORED_OPS
-            "aten::neg": None, # as relu is in _IGNORED_OPS
-            "aten::exp": None, # as relu is in _IGNORED_OPS
-            "aten::flip": None, # as permute is in _IGNORED_OPS
-            "prim::PythonOp.SelectiveScanFn": selective_scan_flop_jit, # latter
-        }
-
-        model = copy.deepcopy(self)
-        model.cuda().eval()
-
-        input = torch.randn((1, *shape), device=next(model.parameters()).device)
-        params = parameter_count(model)[""]
-        Gflops, unsupported = flop_count(model=model, inputs=(input,), supported_ops=supported_ops)
-
-        del model, input
-        return sum(Gflops.values()) * 1e9
-        return f"params {params} GFLOPs {sum(Gflops.values())}"
-
 
 
 class MambaUnet(nn.Module):

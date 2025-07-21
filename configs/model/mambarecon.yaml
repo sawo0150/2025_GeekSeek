@@ -1,6 +1,0 @@
-_target_: utils.model.mambarecon.MambaRecon
-num_cascades: 6
-kspace_mult_factor: 1e6
-use_checkpoint: true
-embed_dim: 64          # Mamba-UNet 내부 파라미터 (원본 확인)
-mlp_ratio: 4

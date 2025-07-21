@@ -1,5 +1,3 @@
-from .mamba_unrolled import MambaUnrolled, MambaUnet
+from .varnet_mamba import MambaVarNet   # api export
 
-__all__ = [
-    "MambaUnrolled", "MambaUnet",
-]
+__all__ = ["MambaVarNet"]
