@@ -1,0 +1,32 @@
+# ----------------------------------------------------------------------
+#  MambaVarNet (VarNet + Mamba-Unrolled regulariser)          ⓒ2025 SNU
+#  * pure-PyTorch (mambapy) backend → GTX 1080 Ti(sm_61) OK
+#  * can be plugged into your existing train.yaml via:
+#        defaults:
+#          - model: mamba_varnet          # ← here
+# ----------------------------------------------------------------------
+
+_target_: utils.model.mambaRecon.MambaVarNet   # ← Python import path of class
+# _target_: utils.model.feature_varnet.FIVarNet   # 사용할 모델 클래스의 전체 경로
+
+# ───── VarNet-level arguments ─────────────────────────────────────────
+num_cascades: 1          # number of cascaded data-consistency blocks
+# use_checkpoint: false     # GPU-RAM ↓,  computation ↑  (can be overridden from CLI)
+
+# ───── Nested kwargs forwarded to `MambaUnrolled` inside each cascade ─
+mamba_kw:
+  patch_size:        2
+  in_chans:          2          # complex ⇒ (real, imag)
+  num_classes:       2
+  # Encoder/decoder depth per stage (same length as `dims`)
+  depths:            [2, 2, 2, 2, 2, 2]
+  # Channel width per stage
+  dims:              [64, 64, 64, 64]
+  d_state:           16
+  drop_rate:         0.0
+  attn_drop_rate:    0.0
+  drop_path_rate:    0.1
+  patch_norm:        true
+  # make inner blocks follow outer checkpoint flag by default
+  # use_checkpoint:    ${..training.checkpointing}
+  use_checkpoint:    true
