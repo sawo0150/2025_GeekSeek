@@ -12,8 +12,8 @@ mask_center: true      # sensitivity estimation 전 k-space 중앙(low‐freq) �
 kspace_mult_factor: 1e6 # k-space 값을 학습 중 수치 안정화를 위해 곱할 스케일링 인자 (추후 동일 값으로 나눠 원상 복원)
 
 # 전역 center-crop 크기(H,W).  null ⇒ crop 없음
-crop_size: null
-# crop_size: [450, 450]
+# crop_size: null
+crop_size: [450, 450]
 
 
 #(2,9,8)설정이 checkpointing 안할때 8420MB...

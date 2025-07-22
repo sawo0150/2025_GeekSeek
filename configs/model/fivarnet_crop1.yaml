@@ -2,7 +2,7 @@
 
 _target_: utils.model.feature_varnet.FIVarNet   # 사용할 모델 클래스의 전체 경로
 
-num_cascades: 6        # Variational cascade 반복 횟수. 복원(iteration) 깊이를 결정 (계산량↑/표현력↑)
+num_cascades: 8        # Variational cascade 반복 횟수. 복원(iteration) 깊이를 결정 (계산량↑/표현력↑)
 chans: 9              # feature‐space U-Net 및 Attention 모듈에서 사용하는 채널(필터) 수
 pools: 4               # feature‐space U-Net의 다운샘플/업샘플 단계 수
 sens_chans: 8          # sensitivity estimation U-Net(민감도 맵 추정망)의 첫 레이어 채널 수
@@ -12,8 +12,8 @@ mask_center: true      # sensitivity estimation 전 k-space 중앙(low‐freq) �
 kspace_mult_factor: 1e6 # k-space 값을 학습 중 수치 안정화를 위해 곱할 스케일링 인자 (추후 동일 값으로 나눠 원상 복원)
 
 # 전역 center-crop 크기(H,W).  null ⇒ crop 없음
-crop_size: null
-# crop_size: [450, 450]
+# crop_size: null
+crop_size: [640, 640]
 
 
 #(2,9,8)설정이 checkpointing 안할때 8420MB...
@@ -42,7 +42,17 @@ crop_size: null
 # (7,9,8) : checkpointing O : 6744
 # (8,9,8) : checkpointing O : 6930
 
-# (9,9,8) : checkpointing O : 7113
-
 # ---- 여기까지 최선...?
+# (9,9,8) : checkpointing O : 7113
 # (10,9,8) : checkpointing O : 7308
+
+
+# (crop 켰을때 - 640, 640)
+
+# (6,9,8) : checkpointing O : 6719
+# (7,9,8) : checkpointing O : 6861
+# (8,9,8) : checkpointing O : 7005
+# (8,9,32) : checkpointing O : 걍 oom 뜸..불가능
+# ---- 여기까지 최선...?
+
+# (9,9,8) : checkpointing O : 7146

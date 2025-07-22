@@ -4,7 +4,7 @@ _target_: utils.augmentations.maskaugmenter.MaskAugmenter
 
 # ---- 공통 스케줄러 (MRaugmenter와 동일) ------------------
 aug_on: true  # 전체 기능 On/Off
-aug_strength: 0.6 # p_max: 최대 적용 확률
+aug_strength: 0.7 # p_max: 최대 적용 확률
 aug_delay: 5      # delay epoch 수 (0~4 epoch 은 p=0)
 aug_schedule_mode: epoch  # 'epoch' | 'val_loss' | 'constant'
 aug_schedule_type: ramp   # 'epoch' | 'val_loss' | 'constant'

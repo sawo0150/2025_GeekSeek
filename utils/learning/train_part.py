@@ -33,6 +33,7 @@ from torchvision.utils import make_grid
 from torchmetrics.image.ssim import StructuralSimilarityIndexMeasure  # ★ NEW
 from torch.cuda.amp import GradScaler, autocast          # ★---
 from torch.nn import Module
+from torch.nn.utils import clip_grad_norm_   # ★ NEW
 
 from collections import defaultdict
 from utils.data.load_data import create_data_loaders
@@ -56,6 +57,10 @@ def train_epoch(args, epoch, model, data_loader, optimizer, scheduler,
     len_loader = len(data_loader)
     total_loss = 0.
     total_slices = 0
+
+    grad_clip_enabled  = getattr(args, "training_grad_clip_enable", False)
+    grad_clip_max_norm = getattr(args, "training_grad_clip_max_norm", 1.0)
+    grad_clip_norm_t   = getattr(args, "training_grad_clip_norm_type", 2)
 
     pbar = tqdm(enumerate(data_loader),
                 total=len_loader,
@@ -106,13 +111,26 @@ def train_epoch(args, epoch, model, data_loader, optimizer, scheduler,
                 model.step()
                 model.zero_grad()
             elif amp_enabled:
-                # unscale / clip_grad 등 필요 시 여기서
+                # # unscale / clip_grad 등 필요 시 여기서
+                # scaler.step(optimizer)
+                # scaler.update()
+                
+                scaler.unscale_(optimizer)
+                if grad_clip_enabled:
+                    clip_grad_norm_(model.parameters(),
+                                    grad_clip_max_norm,
+                                    norm_type=grad_clip_norm_t)
+
                 scaler.step(optimizer)
                 scaler.update()
 
                 optimizer.zero_grad(set_to_none=True)
                 torch.cuda.empty_cache()
             else:
+                if grad_clip_enabled:
+                    clip_grad_norm_(model.parameters(),
+                                    grad_clip_max_norm,
+                                    norm_type=grad_clip_norm_t)
                 optimizer.step()
 
                 # free gradient buffers right after the optimizer step
@@ -253,9 +271,41 @@ def train(args):
     print(f"[Hydra-maskDuplicate] {dup_cfg}")
 
     # ▸ 0. 옵션 파싱 (기본값 유지)
-    accum_steps   = getattr(args, "training_accum_steps",   1)
+    # ───────── Gradient Accumulation 기본값 및 스케줄러 설정 ─────────
+    accum_steps_default = getattr(args, "training_accum_steps", 1)
+    ga_sched_cfg    = getattr(args, "training_grad_accum_scheduler", {"enable": False})
+    ga_sched_enable = ga_sched_cfg.get("enable", False)
+    ga_milestones   = sorted(ga_sched_cfg.get("milestones", []), key=lambda x: x.get("epoch", 0))
+
+    def _accum_steps_for_epoch(ep: int) -> int:
+        """현재 epoch에서 사용할 accum_steps 반환."""
+        if not ga_sched_enable or not ga_milestones:
+            return accum_steps_default
+        curr = accum_steps_default
+        for m in ga_milestones:          # epoch 오름차순
+            if ep >= m.get("epoch", 0):
+                curr = m.get("steps", curr)
+            else:
+                break
+        return max(1, int(curr))
+
+    accum_steps = _accum_steps_for_epoch(0)   # 첫 epoch 기준 초기화
+
     checkpointing = getattr(args, "training_checkpointing", False)
     amp_enabled   = getattr(args, "training_amp",           False)
+    print(f"[Hydra] training: accum_steps={accum_steps} "
+        f"checkpointing={checkpointing} amp_enabled={amp_enabled}")
+    if ga_sched_enable:
+        print(f"[Hydra] grad_accum_scheduler 활성화 → milestones={ga_milestones}")
+
+    # ⬇︎ 추가 ─────────────────────────────────────────────
+    grad_clip_enabled  = getattr(args, "training_grad_clip_enable", False)
+    grad_clip_max_norm = getattr(args, "training_grad_clip_max_norm", 1.0)
+    grad_clip_norm_t   = getattr(args, "training_grad_clip_norm_type", 2)
+    print(f"[Hydra] grad_clip: enable={grad_clip_enabled} "
+        f"max_norm={grad_clip_max_norm} norm_type={grad_clip_norm_t}")
+    # ──────────────────────────────────────────────────
+
 
     early_cfg = getattr(args, "early_stop", {})
     early_enabled = early_cfg.get("enable", False)
@@ -506,6 +556,12 @@ def train(args):
             is_train=True,      # ★ train만 True
             domain_filter=getattr(args, "domain_filter", None),
         )
+
+        # ── epoch별 accum_steps 갱신 ──
+        accum_steps_epoch = _accum_steps_for_epoch(epoch)
+        if accum_steps_epoch != accum_steps:
+            print(f"[GradAccum] Epoch {epoch}: accum_steps {accum_steps} → {accum_steps_epoch}")
+            accum_steps = accum_steps_epoch
 
         train_loss, train_time = train_epoch(args, epoch, model,
                                              train_loader, optimizer, scheduler,
