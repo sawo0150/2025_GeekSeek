@@ -13,7 +13,7 @@ kspace_mult_factor: 1e6 # k-space 값을 학습 중 수치 안정화를 위해 �
 
 # 전역 center-crop 크기(H,W).  null ⇒ crop 없음
 # crop_size: null
-crop_size: [450, 450]
+crop_size: [640, 640]
 
 
 #(2,9,8)설정이 checkpointing 안할때 8420MB...
@@ -42,7 +42,16 @@ crop_size: [450, 450]
 # (7,9,8) : checkpointing O : 6744
 # (8,9,8) : checkpointing O : 6930
 
-# (9,9,8) : checkpointing O : 7113
-
 # ---- 여기까지 최선...?
+# (9,9,8) : checkpointing O : 7113
 # (10,9,8) : checkpointing O : 7308
+
+
+# (crop 켰을때 - 640, 640)
+
+# (6,9,8) : checkpointing O : 6719
+# (7,9,8) : checkpointing O : 6861
+# (8,9,8) : checkpointing O : 7005
+# ---- 여기까지 최선...?
+
+# (9,9,8) : checkpointing O : 7146

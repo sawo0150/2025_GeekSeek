@@ -3,6 +3,29 @@ checkpointing: false        # gradient_checkpoint
 accum_steps:   3            # gradient_accumulation (1이면 이 기능 끄는거임.)
 
 
+grad_clip:           # ⬅︎ 새 섹션
+  enable:   true    # true → clipping 실행, false → 끔
+  max_norm: 1.0      # torch.nn.utils.clip_grad_norm_ 에 전달
+  norm_type: 2       # 2-norm (∞-norm 쓰려면 0 또는 inf)
+  
+# ─────────────────── Gradient Accumulation Scheduler ───────────────────
+#   enable:      true  → milestones에 정의된 규칙 적용
+#   milestones:  - epoch: 0   # 해당 epoch(0-base)부터
+#                - steps: 10  # 사용할 accum_steps
+#   ※ 필요에 맞게 구간을 추가/수정하세요.
+grad_accum_scheduler:
+  enable: true
+  milestones:
+    # 초기 탐색
+    - epoch: 0
+      steps: 2
+    # 안정 훈련
+    - epoch: 5
+      steps: ${training.accum_steps}
+    # 세밀 튜닝: max_epochs - 5
+    - epoch: ${calc:"${max_epochs} - 5"}
+      steps: 4
+      
 deepspeed:
   enable:       false        # ← 스위치 - true or false
   config:                     # DeepSpeed JSON을 그대로 삽입

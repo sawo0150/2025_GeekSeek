@@ -45,7 +45,13 @@ def _flatten_cfg_to_args(cfg: DictConfig) -> SimpleNamespace:
                         "optimizer", "compressor", "collator", "sampler",
                         "evaluation", "early_stop", "maskDuplicate","maskAugment"
                         ,"aug", "centerCropPadding", "deepspeed",
+                        
                         }
+            # ─ Gradient Accum Scheduler dict 보존 (training.grad_accum_scheduler) ─
+            if k == "grad_accum_scheduler" and isinstance(v, Mapping):
+                setattr(args, new_key, v)   # args.training_grad_accum_scheduler 로 접근 가능
+                recurse(new_key, v)
+                continue
 
             # (1) 보존용 속성 먼저 세팅
             if prefix == "" and k in PRESERVE and isinstance(v, Mapping):
