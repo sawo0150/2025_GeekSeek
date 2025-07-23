@@ -12,6 +12,8 @@ from torch.utils.data import default_collate
 from torch.utils.data.sampler import BatchSampler
 from utils.data.transform_wrapper import TransformWrapper
 from utils.data.sampler import GroupByCoilBatchSampler
+from utils.data.transforms import DataTransform, MaskApplyTransform, ImageSpaceCropPad # ✨ ImageSpaceCropPad 추가
+
 
 class MultiCompose:
     def __init__(self, transforms):
@@ -112,7 +114,7 @@ class SliceData(Dataset):
         return (*sample, cat) if not self.forward else sample
 
 
-def create_data_loaders(data_path, args, shuffle=False, isforward=False, 
+def create_data_loaders(data_path, args, shuffle=False, isforward=False,
                         augmenter=None, mask_augmenter=None, is_train=False,
                         domain_filter=None):
     if isforward == False:
@@ -124,41 +126,38 @@ def create_data_loaders(data_path, args, shuffle=False, isforward=False,
 
     transforms = []
 
-    if augmenter is not None and not isforward:
+    # ✨ [수정] 1. 이미지 공간 Crop/Pad를 '학습 시에만' 적용
+    if getattr(args, 'use_crop', False) and is_train:
+        # YAML에서 crop_size를 읽어와 ImageSpaceCropPad 인스턴스 생성
+        crop_size = tuple(getattr(args, 'crop_size', [384, 384]))
+        transforms.append(ImageSpaceCropPad(target_size=crop_size))
+
+    # 2. Augmenter 적용 (이미 is_train과 유사한 조건으로 제어되고 있음)
+    if augmenter is not None and not isforward and is_train:
         transforms.append(augmenter)
 
-    if mask_augmenter is not None and not isforward:
+    if mask_augmenter is not None and not isforward and is_train:
         transforms.append(mask_augmenter)
 
-    from utils.data.transforms import MaskApplyTransform
+    # 3. Mask 적용
     transforms.append(MaskApplyTransform())
 
-    # ✨ [수정] `use_noise_padding` 하이퍼파라미터를 읽어 transform에 전달
-    if getattr(args, 'use_crop', False):
-        # transforms.append(CenterCropOrPad(target_size=tuple(args.crop_size)))
-        transforms.append(instantiate(args.centerCropPadding))
-
-    # # (3) Coil compression (토글)
-    # if getattr(args, "compressor", None):
-    #     comp_tr = instantiate(args.compressor)
-    #     transforms.append(comp_tr)
-
-    # (4) Tensor 변환 및 real/imag 스택
+    # 4. 최종 Tensor 변환
     transforms.append(DataTransform(isforward, max_key_))
 
     transform_chain = MultiCompose(transforms)
 
     raw_ds = SliceData(
-        root=data_path, transform=lambda *x: x,
+        root=data_path, transform=lambda *x: x, # transform_chain은 Wrapper에서 적용됨
         input_key=args.input_key, target_key=target_key_, forward=isforward
     )
-    
+        
     # ───── 도메인(cat) 필터링 ───────────────────────────────────────────
     if domain_filter:
         from utils.data.domain_subset import DomainSubset
         raw_ds = DomainSubset(raw_ds, domain_filter)
 
-    # 2)  *** Duplicate 적용 (crop 前) ***
+    #  *** Duplicate 적용 (crop 前) ***
     dup_cfg = getattr(args,"maskDuplicate",{"enable":False})
     if dup_cfg.get("enable",False) and not isforward and is_train: 
         dup_cfg_clean = OmegaConf.create({k:v for k,v in dup_cfg.items()
@@ -172,17 +171,11 @@ def create_data_loaders(data_path, args, shuffle=False, isforward=False,
     
     collate_fn = default_collate if isforward else instantiate(args.collator, _recursive_=False)
 
-    # # Crop OFF시 batch_size 강제 1
-    # use_crop = getattr(args, 'use_crop', False)
     batch_size = args.batch_size
     if not is_train:
         batch_size = args.val_batch_size
-    # if not use_crop:
-    #     if batch_size != 1:
-    #         print("[WARN] use_crop=False 이므로 batch_size=1로 강제합니다.")
-    #     batch_size = 1
 
-    # 2) sampler 인스턴스 하나만 만들기
+    # sampler 인스턴스 하나만 만들기
     if isforward:
         sampler = GroupByCoilBatchSampler(
             data_source=data_storage,
@@ -200,19 +193,15 @@ def create_data_loaders(data_path, args, shuffle=False, isforward=False,
         )
 
     num_workers = args.num_workers
-    # if not use_crop and isforward:
-    #     if num_workers != 0:
-    #         print("[WARN] use_crop=False + isforward=True => num_workers=0으로 강제!")
-    #     num_workers = 0
 
-    # 3) DataLoader 에 넘겨줄 인자 결정
-    #    sampler 가 BatchSampler 계열이면 batch_sampler=, 아니면 sampler= 로
+    # DataLoader 에 넘겨줄 인자 결정
     if isinstance(sampler, BatchSampler):
         return DataLoader(
             dataset=data_storage,
             batch_sampler=sampler,
             num_workers=num_workers,
-            collate_fn=collate_fn
+            collate_fn=collate_fn,
+            pin_memory=True # 메모리 고정 옵션 추가
         )
     else:
         return DataLoader(
@@ -220,5 +209,6 @@ def create_data_loaders(data_path, args, shuffle=False, isforward=False,
             sampler=sampler,
             batch_size=batch_size,
             num_workers=num_workers,
-            collate_fn=collate_fn
+            collate_fn=collate_fn,
+            pin_memory=True # 메모리 고정 옵션 추가
         )

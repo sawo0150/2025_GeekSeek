@@ -296,3 +296,81 @@ class DataTransform:
         mask = mask.reshape(1, 1, w, 1).float().byte()
         
         return mask, kspace, target, maximum, fname, slice
+    
+class ImageSpaceCropPad:
+    """
+    K-space와 Target 이미지를 모두 이미지 공간에서 Crop/Pad 합니다.
+    이 Transform은 다른 Augmentation보다 먼저 적용되어야 합니다.
+    """
+    def __init__(self, target_size: Tuple[int, int]):
+        self.H0, self.W0 = target_size
+        print(f"✅ ImageSpaceCropPad initialized with target_size: ({self.H0}, {self.W0})")
+
+    def _crop_pad_2d_array(self, arr: np.ndarray, target_shape: Tuple[int, int]) -> np.ndarray:
+        """Helper to crop/pad a 2D numpy array like target."""
+        H0, W0 = target_shape
+        h, w = arr.shape
+        
+        # Crop
+        hc, wc = min(h, H0), min(w, W0)
+        top, left = (h - hc) // 2, (w - wc) // 2
+        cropped = arr[top:top+hc, left:left+wc]
+
+        # Pad
+        pad_h, pad_w = H0 - hc, W0 - wc
+        if pad_h > 0 or pad_w > 0:
+            pad_top, pad_left = pad_h // 2, pad_w // 2
+            pad_bottom, pad_right = pad_h - pad_top, pad_w - pad_left
+            # 이 부분은 이미 올바르게 작성되어 있었습니다.
+            return np.pad(cropped, ((pad_top, pad_bottom), (pad_left, pad_right)), mode='constant', constant_values=0)
+        
+        return cropped
+
+    def __call__(self, mask, kspace, target, attrs, fname, slice_idx):
+        if not isinstance(attrs, Mapping): attrs = {}
+
+        # --- 1. K-space 처리 ---
+        k_cplx = torch.from_numpy(kspace).to(torch.complex64)
+        img_tensor = torch_ifft2c(torch.view_as_real(k_cplx))
+        
+        C, H, W, _ = img_tensor.shape
+        Hc, Wc = min(H, self.H0), min(W, self.W0)
+        top, left = (H - Hc) // 2, (W - Wc) // 2
+        
+        img_cropped = img_tensor[:, top:top+Hc, left:left+Wc, :]
+        
+        img_padded = F.pad(img_cropped.permute(0, 3, 1, 2),
+                           [
+                               (self.W0 - Wc) // 2, self.W0 - Wc - ((self.W0 - Wc) // 2),
+                               (self.H0 - Hc) // 2, self.H0 - Hc - ((self.H0 - Hc) // 2)
+                           ],
+                           mode='constant', value=0  # F.pad는 'value'가 맞습니다.
+                          ).permute(0, 2, 3, 1)
+        
+        k2_tensor = torch_fft2c(img_padded)
+        k2_np = torch.view_as_complex(k2_tensor).numpy()
+
+        # --- 2. Target 처리 ---
+        if isinstance(target, np.ndarray):
+             target2_np = self._crop_pad_2d_array(target, (self.H0, self.W0))
+        else:
+             target2_np = target
+
+        # --- 3. Mask 처리 ---
+        w_orig = mask.shape[0]
+        w_kept = min(w_orig, self.W0)
+        start = (w_orig - w_kept) // 2
+        mask_cropped = mask[start:start+w_kept]
+        
+        pad_w_mask = self.W0 - w_kept
+        pad_left_mask = pad_w_mask // 2
+        pad_right_mask = pad_w_mask - pad_left_mask
+        
+        # ✨ [수정] 여기가 에러의 원인이었습니다. 'value' -> 'constant_values'로 변경
+        mask2_np = np.pad(mask_cropped, (pad_left_mask, pad_right_mask), mode='constant', constant_values=0)
+
+        # --- 4. attrs 업데이트 및 반환 ---
+        attrs = dict(attrs)
+        attrs['recon_size'] = [self.H0, self.W0]
+
+        return mask2_np, k2_np, target2_np, attrs, fname, slice_idx

@@ -11,7 +11,7 @@ defaults:
   - evaluation: leaderboard_cluster
   - optimizer: nadam          # ⬅️ 새로 추가  
   - aug: mraugment    # ⬅️ 새로 추가 none or mraugment
-  - centerCropPadding: crop_kspace # crop_zero or crop_noise or crop_kspace
+  # - centerCropPadding: crop_kspace # crop_zero or crop_noise or crop_kspace
   - maskDuplicate: acc4_acc8       # acc4_acc8 or none
   - maskAugment: universal             # universal or basic or none 
   - collator: identity          # 또는 dynamicCompress or identity or identity_debug
@@ -19,7 +19,7 @@ defaults:
   - sampler: grouping          # 또는 grouping or identity
 
 # === Data Preprocessing === -  Mask → Crop → Compress → Tensor
-use_crop: false                  # spatial crop 사용 여부
+use_crop: true                 # spatial crop 사용 여부
 crop_size: [384, 384]           # crop 할 (H, W) - 무조건 짝수로 지정
 corner_size : 16
 
@@ -35,7 +35,7 @@ report_interval: 5000
 seed: 430
 num_workers: 4
 
-exp_name : fivarnet(8,9,8)-crop(450,450)
+exp_name : croptest
 
 # these three are *required* by utils/data/load_data.py → create_data_loaders
 input_key:  kspace
@@ -43,7 +43,7 @@ target_key: image_label
 max_key:    max
 
 wandb:
-  project: AMP_sweep
+  project: test
   entity: swpants05-seoul-national-university        # W&B 팀/계정
   use_wandb: true           # false 이면 모든 wandb 로그 함수가 noop
   max_vis_per_cat: 5        # epoch 마다 카테고리별 이미지 수 (0 → 안 올림)

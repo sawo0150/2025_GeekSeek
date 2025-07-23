@@ -6,7 +6,7 @@ LICENSE file in the root directory of this source tree.
 """
 
 import math
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 import fastmri
 import torch
@@ -201,7 +201,6 @@ class SensitivityModel(nn.Module):
 
         return x
 
-
 class VarNet(nn.Module):
     """
     A full variational network model.
@@ -242,25 +241,38 @@ class VarNet(nn.Module):
         sens_maps = self.sens_net(masked_kspace, mask)
         kspace_pred = masked_kspace.clone()
 
-        # for cascade in self.cascades:
-        #     kspace_pred = cascade(kspace_pred, masked_kspace, mask, sens_maps)
-        for cascade in self.cascades:
+        for cascade in self.cascades[:-1]:
             if self.use_checkpoint:
-                # activation-checkpointing ↘ 메모리↓, 계산 1회↑
-                kspace_pred = checkpoint(
+                kspace_pred, _ = checkpoint(
                     cascade,
-                    kspace_pred,        # 반드시 Tensor
+                    kspace_pred,
                     masked_kspace,
                     mask,
                     sens_maps,
+                    False,  # return_image
                     use_reentrant=False,
                 )
             else:
-                kspace_pred = cascade(kspace_pred, masked_kspace, mask, sens_maps)
-        result = fastmri.rss(fastmri.complex_abs(fastmri.ifft2c(kspace_pred)), dim=1)
+                kspace_pred, _ = cascade(kspace_pred, masked_kspace, mask, sens_maps, return_image=False)
+
+        # last cascade
+        if self.use_checkpoint:
+            kspace_pred, final_image = checkpoint(
+                self.cascades[-1],
+                kspace_pred,
+                masked_kspace,
+                mask,
+                sens_maps,
+                True,  # return_image
+                use_reentrant=False,
+            )
+        else:
+            kspace_pred, final_image = self.cascades[-1](kspace_pred, masked_kspace, mask, sens_maps, return_image=True)
+
+        result = fastmri.complex_abs(final_image).squeeze(1)
         result = center_crop(result, 384, 384)
         return result
-
+    
 
 class VarNetBlock(nn.Module):
     """
@@ -297,11 +309,85 @@ class VarNetBlock(nn.Module):
         ref_kspace: torch.Tensor,
         mask: torch.Tensor,
         sens_maps: torch.Tensor,
-    ) -> torch.Tensor:
+        return_image: bool = False,
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         zero = torch.zeros(1, 1, 1, 1, 1).to(current_kspace)
         soft_dc = torch.where(mask, current_kspace - ref_kspace, zero) * self.dc_weight
-        model_term = self.sens_expand(
-            self.model(self.sens_reduce(current_kspace, sens_maps)), sens_maps
-        )
 
-        return current_kspace - soft_dc - model_term
+        # 1. k-space -> image space
+        image = self.sens_reduce(current_kspace, sens_maps)  # shape: (b, 1, h, w, 2)
+
+        # 2. 원래 차원 기억
+        b, c, orig_h, orig_w, comp = image.shape
+        assert comp == 2, "Last dim must be 2 for complex."
+        assert c == 1, "Channel should be 1."
+
+        # 3. 채널로 변환
+        image_chan = image.permute(0, 4, 1, 2, 3).reshape(b, 2 * c, orig_h, orig_w)  # (b, 2, orig_h, orig_w)
+
+        # Target size
+        target_h = 384
+        target_w = 384
+
+        # Compute crop amounts (for larger dims)
+        crop_h_top = max(0, (orig_h - target_h) // 2)
+        crop_h_bottom = max(0, orig_h - target_h - crop_h_top)
+        central_h_size = orig_h - crop_h_top - crop_h_bottom
+
+        crop_w_left = max(0, (orig_w - target_w) // 2)
+        crop_w_right = max(0, orig_w - target_w - crop_w_left)
+        central_w_size = orig_w - crop_w_left - crop_w_right
+
+        # Extract central crop
+        central = image_chan[
+            :,
+            :,
+            crop_h_top : crop_h_top + central_h_size,
+            crop_w_left : crop_w_left + central_w_size,
+        ]  # (b, 2, central_h_size, central_w_size)
+
+        # Interpolate the central to target size (instead of padding)
+        resized_central = F.interpolate(
+            central,
+            size=(target_h, target_w),
+            mode='bilinear',
+            align_corners=False,
+        )  # (b, 2, target_h, target_w)
+
+        # 4. model (NormUnet) 처리 - complex로 변환
+        resized_image_complex = resized_central.view(b, 2, c, target_h, target_w).permute(0, 2, 3, 4, 1).contiguous()
+        model_output = self.model(resized_image_complex)  # (b, 1, target_h, target_w, 2)
+
+        # 5. 채널로 변환
+        model_output_chan = model_output.permute(0, 4, 1, 2, 3).reshape(b, 2 * c, target_h, target_w)  # (b, 2, target_h, target_w)
+
+        # Interpolate back to central size (instead of unpadding)
+        processed_central = F.interpolate(
+            model_output_chan,
+            size=(central_h_size, central_w_size),
+            mode='bilinear',
+            align_corners=False,
+        )  # (b, 2, central_h_size, central_w_size)
+
+        # 6. 원본 clone하고 central만 processed로 대체 (peripheral은 원본 유지)
+        restored_image_chan = image_chan.clone()
+        restored_image_chan[
+            :,
+            :,
+            crop_h_top : crop_h_top + central_h_size,
+            crop_w_left : crop_w_left + central_w_size,
+        ] = processed_central
+
+        # 7. complex로 변환
+        restored_image = restored_image_chan.view(b, 2, c, orig_h, orig_w).permute(0, 2, 3, 4, 1).contiguous()
+
+        # 8. image -> k-space
+        model_term = self.sens_expand(restored_image, sens_maps)
+
+        # 9. DC 적용
+        updated_kspace = current_kspace - soft_dc - model_term
+
+        if return_image:
+            return updated_kspace, restored_image
+        else:
+            return updated_kspace, None
