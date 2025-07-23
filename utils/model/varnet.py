@@ -6,7 +6,7 @@ LICENSE file in the root directory of this source tree.
 """
 
 import math
-from typing import List, Tuple, Optional
+from typing import List, Tuple
 
 import fastmri
 import torch
@@ -201,6 +201,7 @@ class SensitivityModel(nn.Module):
 
         return x
 
+
 class VarNet(nn.Module):
     """
     A full variational network model.
@@ -241,39 +242,24 @@ class VarNet(nn.Module):
         sens_maps = self.sens_net(masked_kspace, mask)
         kspace_pred = masked_kspace.clone()
 
-        for cascade in self.cascades[:-1]:
+        # for cascade in self.cascades:
+        #     kspace_pred = cascade(kspace_pred, masked_kspace, mask, sens_maps)
+        for cascade in self.cascades:
             if self.use_checkpoint:
-                kspace_pred, _ = checkpoint(
+                # activation-checkpointing ↘ 메모리↓, 계산 1회↑
+                kspace_pred = checkpoint(
                     cascade,
-                    kspace_pred,
+                    kspace_pred,        # 반드시 Tensor
                     masked_kspace,
                     mask,
                     sens_maps,
-                    False,  # return_image
                     use_reentrant=False,
                 )
             else:
-                kspace_pred, _ = cascade(kspace_pred, masked_kspace, mask, sens_maps, return_image=False)
-
-        # last cascade
-        if self.use_checkpoint:
-            kspace_pred, final_image = checkpoint(
-                self.cascades[-1],
-                kspace_pred,
-                masked_kspace,
-                mask,
-                sens_maps,
-                True,  # return_image
-                use_reentrant=False,
-            )
-        else:
-            kspace_pred, final_image = self.cascades[-1](kspace_pred, masked_kspace, mask, sens_maps, return_image=True)
-
-        result = fastmri.complex_abs(final_image).squeeze(1)
+                kspace_pred = cascade(kspace_pred, masked_kspace, mask, sens_maps)
+        result = fastmri.rss(fastmri.complex_abs(fastmri.ifft2c(kspace_pred)), dim=1)
         result = center_crop(result, 384, 384)
         return result
-    
-
 class VarNetBlock(nn.Module):
     """
     Model block for end-to-end variational network.
@@ -309,8 +295,7 @@ class VarNetBlock(nn.Module):
         ref_kspace: torch.Tensor,
         mask: torch.Tensor,
         sens_maps: torch.Tensor,
-        return_image: bool = False,
-    ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+    ) -> torch.Tensor:
         zero = torch.zeros(1, 1, 1, 1, 1).to(current_kspace)
         soft_dc = torch.where(mask, current_kspace - ref_kspace, zero) * self.dc_weight
 
@@ -385,9 +370,4 @@ class VarNetBlock(nn.Module):
         model_term = self.sens_expand(restored_image, sens_maps)
 
         # 9. DC 적용
-        updated_kspace = current_kspace - soft_dc - model_term
-
-        if return_image:
-            return updated_kspace, restored_image
-        else:
-            return updated_kspace, None
+        return current_kspace - soft_dc - model_term
