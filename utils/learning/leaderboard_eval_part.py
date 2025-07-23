@@ -1,86 +1,108 @@
+# utils/learning/leaderboard_eval_part.py
 """
-통합 파이프라인에서 쓰기 편하도록
-reconstruct.py · leaderboard_eval.py 의 'forward' 를 thin-wrapper 로 묶어둔다.
+[PROMPT-MR] 버전: 모델 객체를 직접 받아 리더보드 평가를 수행.
+외부 스크립트 의존성을 제거하고, 현재 학습된 모델의 상태를 직접 평가.
 """
-# ---------------------------------------------------------------------------
-#  FastMRI – leaderboard_eval_part.py
-#  * acc4/acc8 재구성  →  SSIM 계산  →  dict 반환
-#    - 1순위 : 새 `reconstruct_from_ckpt.py` 사용 (체크포인트 기반)
-#    - 2순위 : 기존 `reconstruct.py` 의 forward(SimpleNamespace) 사용
-# ---------------------------------------------------------------------------
-
 from types import SimpleNamespace
 from pathlib import Path
-import torch, importlib, time
-from tqdm import tqdm          # ★ progress bar
+import torch
+import importlib
+from tqdm import tqdm
 
-# --- reconstruct 모듈 선택 ---------------------------------------------------
-# reconstruct_from_ckpt.py 가 있으면 우선 사용
+# [PROMPT-MR] 필요한 모듈 직접 임포트
+from utils.data.load_data import create_data_loaders
+from utils.common.utils import save_reconstructions
+# leaderboard_eval.py 모듈은 SSIM 계산을 위해 계속 사용
 try:
-    rckpt_mod = importlib.import_module("reconstruct_from_ckpt")
-    HAVE_RCKPT = True
-except ModuleNotFoundError:
-    HAVE_RCKPT = False
+    eval_mod = importlib.import_module("leaderboard_eval")
+except ImportError:
+    print("Warning: 'leaderboard_eval' module not found. SSIM calculation will fail.")
+    eval_mod = None
 
-# fallback: 예전 방식의 reconstruct.py
-recon_mod = importlib.import_module("reconstruct")   # 없으면 그대로 Exception
-
-# leaderboard 평가 모듈 (고정)
-eval_mod  = importlib.import_module("leaderboard_eval")
+# test 함수는 test_part에서 가져오지 않고, 이 파일 내에서 간단히 재정의하거나
+# test_part.py에 대한 의존성을 명시적으로 둠. 여기서는 후자를 선택.
+try:
+    from utils.learning.test_part import test
+except ImportError:
+    print("Warning: 'test_part' module not found. Reconstruction will fail.")
+    test = None
 
 
 def run_leaderboard_eval(
-        model_ckpt_dir: Path,
-        leaderboard_root: Path,
-        gpu: int = 0,
-        batch_size: int = 1,
-        output_key: str = "reconstruction",
+        args: SimpleNamespace,
+        model: torch.nn.Module,
+        classifier: torch.nn.Module,
     ):
     """
-    ①  acc4/acc8 recon → ../reconstructions_leaderboard/<accX>
-    ②  SSIM 계산 → (ssim4, ssim8, mean)
+    [PROMPT-MR] 버전: 모델 객체를 직접 받아 리더보드 평가를 수행
+    ① acc4/acc8 recon -> ../reconstructions_leaderboard/<accX>
+    ② SSIM 계산 -> (ssim4, ssim8, mean)
     """
-    recon_root = model_ckpt_dir.parent / "reconstructions_leaderboard"
+    if not eval_mod or not test:
+        print("Required modules for leaderboard evaluation are missing. Aborting.")
+        return {"acc4": 0, "acc8": 0, "mean": 0}
+
+    eval_cfg = args.evaluation
+    leaderboard_root = Path(eval_cfg["leaderboard_root"])
+    recon_root = Path(args.exp_dir).parent / "reconstructions_leaderboard"
     recon_root.mkdir(parents=True, exist_ok=True)
+    
+    device = next(model.parameters()).device
+    model.eval()
+    if classifier:
+        classifier.to(device)
+        classifier.eval()
 
     # ---------- 1. Reconstruction ----------
-    if HAVE_RCKPT:
-        # ① 체크포인트 선택 (best 우선 → model.pt)
-        ckpt_path = (model_ckpt_dir / "best_model.pt") if (model_ckpt_dir / "best_model.pt").exists() \
-                    else (model_ckpt_dir / "model.pt")
+    for acc in tqdm(("acc4", "acc8"), desc="Leaderboard-Recon", ncols=90, leave=False):
+        data_path = leaderboard_root / acc
+        forward_dir = recon_root / acc
+        forward_dir.mkdir(exist_ok=True)
 
-        # ② args 복원 + 런타임 옵션 적용
-        base_args = rckpt_mod.load_args_from_ckpt(ckpt_path)
-        base_args = rckpt_mod.prepare_recon_args(base_args, gpu, batch_size)
+        if not data_path.exists():
+            print(f"Warning: Leaderboard data path not found at {data_path}. Skipping {acc}.")
+            continue
+            
+        recon_args = SimpleNamespace(
+            GPU_NUM=args.GPU_NUM,
+            batch_size=eval_cfg.get("batch_size", 1),
+            data_path=data_path,
+            forward_dir=forward_dir,
+            num_workers=args.num_workers,
+            input_key=args.input_key,
+            collator=getattr(args, 'collator', None),
+            sampler=getattr(args, 'sampler', None),
+            use_crop=getattr(args, 'use_crop', False),
+            centerCropPadding=getattr(args, 'centerCropPadding', None),
+            max_key = getattr(args, 'max_key', -1), # isforward=True일 때 필요
+            target_key = getattr(args, 'target_key', None) # isforward=True일 때 필요
+        )
+        
+        loader = create_data_loaders(
+            data_path=data_path, 
+            args=recon_args, 
+            isforward=True, 
+            classifier=classifier
+        )
 
-        # ③ acc4 / acc8 각각 reconstruct
-        for acc in ("acc4", "acc8"):
-            rckpt_mod.reconstruct_for_acc(base_args, acc, Path(leaderboard_root))
-    else:
-        # (구버전) reconstruct.py 의 forward(SimpleNamespace) 이용
-        for acc in ("acc4", "acc8"):
-            args_recon = SimpleNamespace(
-                GPU_NUM=gpu,
-                batch_size=batch_size,
-                net_name=model_ckpt_dir.parent.name,
-                path_data=Path(leaderboard_root) / acc,
-                cascade=None, chans=None, sens_chans=None,  # 그대로 두면 VarNet default
-                input_key="kspace",
-                exp_dir=model_ckpt_dir,
-                data_path=None, forward_dir=None,           # reconstruct.py 내부에서 쓰임
-            )
-            recon_mod.forward(args_recon)   # 저장만 하고 리턴값은 무시
-
+        reconstructions, _ = test(recon_args, model, loader, classifier)
+        save_reconstructions(reconstructions, forward_dir)
+    
     # ---------- 2. Evaluation ----------
     ssim = {}
-    for acc in tqdm(("acc4", "acc8"), desc="SSIM-eval", leave=False):
+    for acc in tqdm(("acc4", "acc8"), desc="SSIM-eval", ncols=90, leave=False):
+        your_data_path = recon_root / acc
+        if not any(your_data_path.iterdir()):
+             print(f"Warning: No reconstructions found for {acc} at {your_data_path}. Setting SSIM to 0.")
+             ssim[acc] = 0.0
+             continue
+
         args_eval = SimpleNamespace(
-            GPU_NUM=gpu,
-            leaderboard_data_path=Path(leaderboard_root) / acc / "image",
-            your_data_path=recon_root / acc,
-            output_key=output_key,
+            leaderboard_data_path=leaderboard_root / acc / "image",
+            your_data_path=your_data_path,
+            output_key=eval_cfg.get("output_key", "reconstruction"),
         )
         ssim[acc] = eval_mod.forward(args_eval)
 
-    ssim["mean"] = (ssim["acc4"] + ssim["acc8"]) / 2
+    ssim["mean"] = (ssim.get("acc4", 0) + ssim.get("acc8", 0)) / 2.0
     return ssim
