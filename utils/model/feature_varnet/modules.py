@@ -11,8 +11,7 @@ from fastmri.data.transforms import batched_mask_center, center_crop
 from fastmri.fftc import fft2c_new as fft2c
 from fastmri.fftc import ifft2c_new as ifft2c
 
-from .utils import complex_to_chan_dim, chan_complex_to_last_dim
-from .utils import sens_expand, sens_reduce
+from .deformable_LKA import deformable_LKA_Attention
 
 class NormStats(nn.Module):
     # def forward(self, data: Tensor) -> Tuple[Tensor, Tensor]:
@@ -633,3 +632,83 @@ class SensitivityModel(nn.Module):
         return self.divide_root_sum_of_squares(
             self.batch_chans_to_chan_dim(self.norm_unet(images), batches)
         )
+
+
+class DLKAConvBlock(nn.Module):
+    def __init__(self, in_chans, out_chans, drop_prob=0.0):
+        super().__init__()
+        self.conv = nn.Conv2d(in_chans, out_chans, 3, 1, 1, bias=False)
+        self.norm = nn.InstanceNorm2d(out_chans)
+        self.lka  = deformable_LKA_Attention(out_chans)
+        self.act  = nn.LeakyReLU(0.2, inplace=True)
+    def forward(self,x):
+        return self.act(self.lka(self.norm(self.conv(x))))
+
+class DLKAUnet2d(Unet2d):
+    """Unet2d 구현을 그대로 상속하되 ConvBlock → DLKAConvBlock 로 치환"""
+    def __init__(self, *a, **kw):
+        super().__init__(*a, **kw)
+        # down / up 모듈 내부 ConvBlock 치환
+        def _replace(module):
+            for name, m in module.named_children():
+                if isinstance(m, ConvBlock):
+                    setattr(module, name,
+                            DLKAConvBlock(m.in_chans, m.out_chans, m.drop_prob))
+                else:
+                    _replace(m)
+        _replace(self)
+
+
+class DLKADeepUnet2d(Unet2d):
+    """
+    DLKAConvBlock을 인코더의 Stage-2,3(E2,E3)와 병목에만 적용한 Unet2d.
+    나머지 레이어(얕은 인코더·전체 디코더)는 기존 ConvBlock 사용.
+    """
+    def __init__(self,
+                 in_chans: int,
+                 out_chans: int,
+                 chans: int = 32,
+                 num_pool_layers: int = 4,
+                 drop_prob: float = 0.0,
+                 output_bias: bool = False):
+        super().__init__(in_chans, out_chans, chans,
+                         num_pool_layers, drop_prob, output_bias)
+
+        # ── Unet2d 계층(self.layer)을 타고 내려가며
+        #    ConvBlock에 해당하는 left_block들만 추출해서
+        #    down_sample_layers 리스트와 bottleneck conv 참조(self.conv)를 만들어 준다.
+        down_layers = []
+        node = self.layer.child    # root(self.layer) 바로 아래부터 시작
+        while node is not None:
+            down_layers.append(node.left_block)
+            node = node.child       # 다음 단계로
+        self.down_sample_layers = down_layers
+        self.conv = down_layers[-1] if down_layers else None
+
+        # ------------------------------------------------------------------ #
+        # helper: ConvBlock → DLKAConvBlock 치환
+        # ------------------------------------------------------------------ #
+        def _to_dlka(block: nn.Module):
+            """
+            주어진 모듈 하위의 ConvBlock만 DLKAConvBlock으로 교체
+            (decoder에서 쓰는 ConvBlock은 호출되지 않도록 주의)
+            """
+            for name, m in block.named_children():
+                if isinstance(m, ConvBlock):
+                    setattr(block, name,
+                            DLKAConvBlock(m.in_chans, m.out_chans, m.drop_prob))
+
+        # ------------------------------------------------------------------ #
+        # ❶ 인코더 깊은 두 단계(E2, E3) 치환
+        #    self.down_sample_layers[0] → E0, 1→E1, 2→E2, 3→E3
+        # ------------------------------------------------------------------ #
+        deep_stages = list(range(num_pool_layers - 2, num_pool_layers))  # [2,3]
+        for idx in deep_stages:
+            _to_dlka(self.down_sample_layers[idx])
+
+        # ------------------------------------------------------------------ #
+        # ❷ 병목(conv) 치환
+        # ------------------------------------------------------------------ #
+        _to_dlka(self.conv)
+
+        # ※ self.up_conv / right_block 들은 건드리지 않음 ⇒ 디코더는 Conv 유지

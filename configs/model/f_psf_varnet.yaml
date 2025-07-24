@@ -1,0 +1,43 @@
+# configs/model/psf_varnet.yaml
+_target_: utils.model.feature_varnet.FlexibleCascadeVarNet
+
+
+# ────────────────────────────────────────────────────────────────
+# 순수 PSF-guided 구조:  [PSF] → Feature → VarNet
+# ────────────────────────────────────────────────────────────────
+variant: "psf"
+
+# [ psf_blks , feat_blks , img_blks ]
+cascade_counts: [3, 13, 0]
+
+chans: 9
+pools: 4
+
+sens_chans: 8
+sens_pools: 4
+mask_center: true
+
+# ───────── PSF-guided attention 설정 ─────────
+psf_K: 8
+psf_radius: 4
+psf_exclude_center: false
+
+# ───────── 기타 공통 하이퍼파라미터 ─────────
+acceleration: 4             # undersampling factor (used for logging)
+kspace_mult_factor: 1e6
+# crop_size: [640, 640]
+crop_size: none
+
+
+
+# (crop 껐을때)
+
+# (2+4+6,9,8) : checkpointing O : 6512 - 예상시간 : 1epoch : 3시간 <-- 기존이랑 같음...
+# (2+6+6,9,8) : checkpointing O : 6515, 
+# (7,9,8) : checkpointing O : 6861
+# (3+10+4,9,8) : checkpointing O : 6504 - 예상시간 : 1epoch : 4시간 <-- 기존이랑 같음...
+# (3+10+6,9,8) : checkpointing O : 6522 - 예상시간 : 1epoch : 4시간 <-- 기존이랑 같음...
+# (3+13+0,9,8) : checkpointing O : 6463 - 예상시간 : 1epoch : 4시간 <-- 기존이랑 같음...
+# (3+13+10,9,8) : checkpointing O : 6558 - 예상시간 : 1epoch : 5시간 -> vessl 15시간 <- 이건 좀.. 25일 25*24/15 = 40
+
+# (crop 켰을때 - 640, 640)

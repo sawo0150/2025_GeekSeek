@@ -10,6 +10,8 @@ from .utils import sens_expand, sens_reduce, image_uncrop, image_crop, FeatureIm
 from .attention import AttentionPE
 from .modules import Unet2d
 
+from .attention import PSFDeformableAttention
+
 class AttentionFeatureVarNetBlock(nn.Module):
     def __init__(
         self,
@@ -270,3 +272,17 @@ class VarNetBlock(nn.Module):
         )
 
         return current_kspace - soft_dc - model_term
+    
+class PSFVarNetBlock(FeatureVarNetBlock):
+    def __init__(self,
+                 encoder, decoder,
+                 feature_processor,
+                 psf_K=8, psf_radius=4):
+        super().__init__(encoder, decoder, feature_processor)
+        self.psf_attn = PSFDeformableAttention(
+            in_chans=encoder.feature_chans,
+            K=psf_K, radius=psf_radius)
+    def forward(self, fi: FeatureImage) -> FeatureImage:
+        # PSF-guided deformable → 기존 forward 이어서 호출
+        fi = fi._replace(features=self.psf_attn(fi.features, fi.beta))   # beta=psf_tbl
+        return super().forward(fi)
