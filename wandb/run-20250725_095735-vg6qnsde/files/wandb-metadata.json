@@ -1,0 +1,40 @@
+{
+  "os":  "Linux-6.8.0-64-generic-x86_64-with-glibc2.35",
+  "python":  "CPython 3.11.4",
+  "startedAt":  "2025-07-25T00:57:35.301672Z",
+  "program":  "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/main.py",
+  "codePath":  "main.py",
+  "codePathLocal":  "main.py",
+  "git":  {
+    "remote":  "git@github.com:sawo0150/2025_GeekSeek.git",
+    "commit":  "d3baaadc2e413f4b2f23e501b0fc23fad4121c1a"
+  },
+  "email":  "swpants05@snu.ac.kr",
+  "root":  "/home/swpants05/Desktop/2025_FastMri/2025_GeekSeek",
+  "host":  "swpants05-desktop",
+  "executable":  "/home/swpants05/.pyenv/versions/3.11.4/bin/python3",
+  "cpu_count":  8,
+  "cpu_count_logical":  16,
+  "gpu":  "NVIDIA GeForce RTX 4070 SUPER",
+  "gpu_count":  1,
+  "disk":  {
+    "/":  {
+      "total":  "982818799616",
+      "used":  "658619760640"
+    }
+  },
+  "memory":  {
+    "total":  "67340537856"
+  },
+  "gpu_nvidia":  [
+    {
+      "name":  "NVIDIA GeForce RTX 4070 SUPER",
+      "memoryTotal":  "12878610432",
+      "cudaCores":  7168,
+      "architecture":  "Ada",
+      "uuid":  "GPU-15ce3daf-aa6f-fd1c-9624-e83615081790"
+    }
+  ],
+  "cudaVersion":  "12.4",
+  "writerId":  "yiardmjv6ox5amlx03a6cgjff0719o21"
+}

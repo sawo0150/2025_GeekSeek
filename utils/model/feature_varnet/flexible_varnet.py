@@ -19,6 +19,7 @@ from .modules import Unet2d, NormUnet, SensitivityModel, DLKAUnet2d, DLKADeepUne
 from .attention import AttentionPE
 from typing import List, NamedTuple, Optional, Tuple
 import math
+import inspect        # ★ NEW
 
 # utils/model/flexible_varnet.py
 class FlexibleCascadeVarNet(nn.Module):
@@ -31,12 +32,26 @@ class FlexibleCascadeVarNet(nn.Module):
     def __init__(self,
         cascade_counts: List[int],              # [n1,n2,…]
         variant: str,
+        image_conv_cascades: Optional[List[int]] = None,
         **kw, ):
         super().__init__()
         self.variant = variant
-        enc = FeatureEncoder(in_chans=2, feature_chans=kw.get("chans",18))
-        dec = FeatureDecoder(feature_chans=kw.get("chans",18), out_chans=2)
 
+
+        # ── 새 하이퍼파라미터 분리 ──────────────────────────────────────
+        feature_chans = kw.get("feature_chans", kw.get("chans", 18))
+        unet_chans    = kw.get("unet_chans",    kw.get("chans", 32))
+
+        enc = FeatureEncoder(in_chans=2, feature_chans=feature_chans)
+        dec = FeatureDecoder(feature_chans=feature_chans, out_chans=2)
+
+
+        # ───────── extra 1×1 conv 를 걸 cascade 인덱스 목록 ──────────
+        if image_conv_cascades is None:
+            image_conv_cascades = [
+                i for i in range(sum(cascade_counts)) if i % 3 == 0
+            ]
+        self.image_conv_cascades = image_conv_cascades
 
         # ------------------------------------------------------------------ #
         #  공통 모듈 & 하이퍼파라미터
@@ -73,34 +88,82 @@ class FlexibleCascadeVarNet(nn.Module):
         self.norm_fn     = NormStats()
         
         # ------------------------------------------------------------------ #
-        #  Feature-space cascades 구성
+        # ❶ helper: 매 cascade 마다 **새로운** feature_processor 생성 ----------- #
         # ------------------------------------------------------------------ #
         blocks: List[nn.Module] = []
-        idx=0
+        cur_idx = 0            # 전 cascade 인덱스
 
-        def _add(block_cls, n, **bkw):
-            nonlocal idx
+        def _add(
+            block_cls,
+            n: int,
+            fp_cls,
+            fp_kw: dict,
+            **extra_kw,
+        ):
+            """
+            block_cls           : FeatureVarNetBlock / PSFVarNetBlock …
+            n                   : 반복 횟수
+            fp_cls, fp_kw       : feature-processor(Unet) class & kwargs
+            extra_kw            : block-specific 인자 (psf_K 등)
+            """
+            nonlocal cur_idx
             for _ in range(n):
-                blocks.append(block_cls(encoder=enc, decoder=dec, **bkw))
-                idx += 1
+                use_img_conv = cur_idx in self.image_conv_cascades
+                fp = fp_cls(**fp_kw)              # ☆ fresh UNet per cascade
+
+                # 블록 생성 시 인자 구성
+                init_kwargs = dict(
+                    encoder=enc,
+                    decoder=dec,
+                    feature_processor=fp,
+                    **extra_kw,
+                )
+                # 일부 블록만 use_extra_feature_conv 지원
+                if "use_extra_feature_conv" in inspect.signature(block_cls).parameters:
+                    init_kwargs["use_extra_feature_conv"] = use_img_conv
+                blocks.append(block_cls(**init_kwargs))
+                cur_idx += 1
+
         if variant=="psf":
             # _add(PSFVarNetBlock,        cascade_counts[0], feature_processor=Unet2d(**kw))
             # _add(FeatureVarNetBlock,    cascade_counts[1], feature_processor=Unet2d(**kw))
+            # _add(
+            #     PSFVarNetBlock, cascade_counts[0],
+            #     psf_K=self.psf_K, psf_radius=self.psf_radius,
+            #     feature_processor=Unet2d(
+            #         in_chans=enc.feature_chans,
+            #         out_chans=enc.feature_chans,
+            #         num_pool_layers=kw.get("pools", 4),
+            #     ),
+            # )
+            # _add(
+            #     FeatureVarNetBlock, cascade_counts[1],
+            #     feature_processor=Unet2d(
+            #         in_chans=enc.feature_chans,
+            #         out_chans=enc.feature_chans,
+            #         num_pool_layers=kw.get("pools", 4),
+            #     ),
+            # )
             _add(
                 PSFVarNetBlock, cascade_counts[0],
-                psf_K=self.psf_K, psf_radius=self.psf_radius,
-                feature_processor=Unet2d(
+                fp_cls=Unet2d,
+                fp_kw=dict(
                     in_chans=enc.feature_chans,
                     out_chans=enc.feature_chans,
                     num_pool_layers=kw.get("pools", 4),
+                    chans=unet_chans,
                 ),
+                psf_K=self.psf_K,
+                psf_radius=self.psf_radius,
             )
             _add(
                 FeatureVarNetBlock, cascade_counts[1],
-                feature_processor=Unet2d(
+                fp_cls=Unet2d,
+                fp_kw=dict(
                     in_chans=enc.feature_chans,
                     out_chans=enc.feature_chans,
                     num_pool_layers=kw.get("pools", 4),
+                    chans=unet_chans,
                 ),
             )
         elif variant=="dlka":
@@ -108,20 +171,40 @@ class FlexibleCascadeVarNet(nn.Module):
             #      feature_processor=DLKAUnet2d(**kw))
             # _add(FeatureVarNetBlock,    cascade_counts[1], feature_processor=Unet2d(**kw))
 
+            # _add(
+            #     FeatureVarNetBlock, cascade_counts[0],
+            #     feature_processor=DLKADeepUnet2d(
+            #         in_chans=enc.feature_chans,
+            #         out_chans=enc.feature_chans,
+            #         num_pool_layers=kw.get("pools", 4),
+            #     ),
+            # )
+            # _add(
+            #     FeatureVarNetBlock, cascade_counts[1],
+            #     feature_processor=Unet2d(
+            #         in_chans=enc.feature_chans,
+            #         out_chans=enc.feature_chans,
+            #         num_pool_layers=kw.get("pools", 4),
+            #     ),
+            # )
             _add(
                 FeatureVarNetBlock, cascade_counts[0],
-                feature_processor=DLKADeepUnet2d(
+                fp_cls=DLKADeepUnet2d,
+                fp_kw=dict(
                     in_chans=enc.feature_chans,
                     out_chans=enc.feature_chans,
                     num_pool_layers=kw.get("pools", 4),
+                    chans=unet_chans,
                 ),
             )
             _add(
                 FeatureVarNetBlock, cascade_counts[1],
-                feature_processor=Unet2d(
+                fp_cls=Unet2d,
+                fp_kw=dict(
                     in_chans=enc.feature_chans,
                     out_chans=enc.feature_chans,
                     num_pool_layers=kw.get("pools", 4),
+                    chans=unet_chans,
                 ),
             )
         elif variant=="psf_dlka":
@@ -130,29 +213,62 @@ class FlexibleCascadeVarNet(nn.Module):
             # _add(FeatureVarNetBlock,    cascade_counts[1],
             #      feature_processor=DLKAUnet2d(**kw))
             # _add(FeatureVarNetBlock,    cascade_counts[2], feature_processor=Unet2d(**kw))
+            # _add(
+            #     PSFVarNetBlock, cascade_counts[0],
+            #     psf_K=self.psf_K, psf_radius=self.psf_radius,
+            #     feature_processor=DLKADeepUnet2d(
+            #         in_chans=enc.feature_chans,
+            #         out_chans=enc.feature_chans,
+            #         num_pool_layers=kw.get("pools", 4),
+            #     ),
+            # )
+            # _add(
+            #     FeatureVarNetBlock, cascade_counts[1],
+            #     feature_processor=DLKADeepUnet2d(
+            #         in_chans=enc.feature_chans,
+            #         out_chans=enc.feature_chans,
+            #         num_pool_layers=kw.get("pools", 4),
+            #     ),
+            # )
+            # _add(
+            #     FeatureVarNetBlock, cascade_counts[2],
+            #     feature_processor=Unet2d(
+            #         in_chans=enc.feature_chans,
+            #         out_chans=enc.feature_chans,
+            #         num_pool_layers=kw.get("pools", 4),
+            #     ),
+            # )
+
             _add(
                 PSFVarNetBlock, cascade_counts[0],
-                psf_K=self.psf_K, psf_radius=self.psf_radius,
-                feature_processor=DLKADeepUnet2d(
+                fp_cls=DLKADeepUnet2d,
+                fp_kw=dict(
                     in_chans=enc.feature_chans,
                     out_chans=enc.feature_chans,
                     num_pool_layers=kw.get("pools", 4),
+                    chans=unet_chans,
                 ),
+                psf_K=self.psf_K,
+                psf_radius=self.psf_radius,
             )
             _add(
                 FeatureVarNetBlock, cascade_counts[1],
-                feature_processor=DLKADeepUnet2d(
+                fp_cls=DLKADeepUnet2d,
+                fp_kw=dict(
                     in_chans=enc.feature_chans,
                     out_chans=enc.feature_chans,
                     num_pool_layers=kw.get("pools", 4),
+                    chans=unet_chans,
                 ),
             )
             _add(
                 FeatureVarNetBlock, cascade_counts[2],
-                feature_processor=Unet2d(
+                fp_cls=Unet2d,
+                fp_kw=dict(
                     in_chans=enc.feature_chans,
                     out_chans=enc.feature_chans,
                     num_pool_layers=kw.get("pools", 4),
+                    chans=unet_chans,
                 ),
             )
 

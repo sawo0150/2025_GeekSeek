@@ -49,6 +49,12 @@ from utils.logging.receptive_field import log_receptive_field
 def train_epoch(args, epoch, model, data_loader, optimizer, scheduler,
                 loss_type, ssim_metric, metricLog_train,
                 scaler, amp_enabled, use_deepspeed, accum_steps):
+    # print(sum(p.numel() for p in model.parameters()))
+    # from utils.model.feature_varnet.modules import DLKAConvBlock
+    # for n,m in model.named_modules():
+    #     if isinstance(m, DLKAConvBlock): print("DLKA at", n)
+    # for n, p in model.named_parameters(): print(n, p.numel())
+
     model.train()
     # reset peak memory counter at the start of each epoch
     torch.cuda.reset_peak_memory_stats()

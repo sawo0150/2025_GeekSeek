@@ -10,7 +10,8 @@ variant: "psf"
 # [ psf_blks , feat_blks , img_blks ]
 cascade_counts: [3, 13, 0]
 
-chans: 9
+feature_chans: 9                 # encoder/decoder 내부 채널 수
+unet_chans:    32                # UNet(Feature-Processor) base 채널 수
 pools: 4
 
 sens_chans: 8

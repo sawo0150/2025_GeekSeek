@@ -66,7 +66,6 @@ class FIVarNet(nn.Module):
                 )
             )
         self.feat_cascades = nn.ModuleList(feat_blocks)
-        self.feat_cascades = nn.ModuleList(feat_blocks)
 
         self.image_cascades = nn.ModuleList(
             [VarNetBlock(NormUnet(chans, pools)) for _ in range(num_cascades)]

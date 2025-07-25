@@ -674,41 +674,42 @@ class DLKADeepUnet2d(Unet2d):
         super().__init__(in_chans, out_chans, chans,
                          num_pool_layers, drop_prob, output_bias)
 
-        # ── Unet2d 계층(self.layer)을 타고 내려가며
-        #    ConvBlock에 해당하는 left_block들만 추출해서
-        #    down_sample_layers 리스트와 bottleneck conv 참조(self.conv)를 만들어 준다.
-        down_layers = []
-        node = self.layer.child    # root(self.layer) 바로 아래부터 시작
-        while node is not None:
-            down_layers.append(node.left_block)
-            node = node.child       # 다음 단계로
-        self.down_sample_layers = down_layers
-        self.conv = down_layers[-1] if down_layers else None
 
         # ------------------------------------------------------------------ #
-        # helper: ConvBlock → DLKAConvBlock 치환
+        # ❶ 재귀 치환 함수 – depth 를 인자로 받아 encoder 깊은 두 stage(E2,E3)와
+        #    bottleneck(conv) 에 한해 ConvBlock → DLKAConvBlock 교체
         # ------------------------------------------------------------------ #
-        def _to_dlka(block: nn.Module):
+        def _replace_recursive(module: nn.Module, cur_depth: int):
+            """DFS 로 Unet level 을 내려가며 left_block 만 치환.
+
+            depth: 0 → E0, 1 → E1, 2 → E2, 3 → E3 …
             """
-            주어진 모듈 하위의 ConvBlock만 DLKAConvBlock으로 교체
-            (decoder에서 쓰는 ConvBlock은 호출되지 않도록 주의)
-            """
-            for name, m in block.named_children():
-                if isinstance(m, ConvBlock):
-                    setattr(block, name,
-                            DLKAConvBlock(m.in_chans, m.out_chans, m.drop_prob))
+            # ① 현재 노드의 left_block 확인
+            if hasattr(module, "left_block") and isinstance(module.left_block, ConvBlock):
+                if cur_depth >= num_pool_layers - 2:           # E2, E3
+                    dlka_blk = DLKAConvBlock(
+                        module.left_block.in_chans,
+                        module.left_block.out_chans,
+                        module.left_block.drop_prob,
+                    )
+                    setattr(module, "left_block", dlka_blk)
+
+            # ② child 가 있으면 계속 내려가기
+            if hasattr(module, "child") and isinstance(module.child, nn.Module):
+                _replace_recursive(module.child, cur_depth + 1)
+
+        # 👉 실제 치환 실행
+        _replace_recursive(self.layer, cur_depth=0)
+
+        # # ------------------------------------------------------------------ #
+        # # ❷ bottleneck(self.conv) 치환 – 항상 depth==num_pool_layers
+        # # ------------------------------------------------------------------ #
+        # if isinstance(self.conv, ConvBlock):
+        #     self.conv = DLKAConvBlock(
+        #         self.conv.in_chans, self.conv.out_chans, self.conv.drop_prob
+        #     )
 
         # ------------------------------------------------------------------ #
-        # ❶ 인코더 깊은 두 단계(E2, E3) 치환
-        #    self.down_sample_layers[0] → E0, 1→E1, 2→E2, 3→E3
+        # ❸ debug 플래그 – DLKA 블록 삽입 여부 확인용
         # ------------------------------------------------------------------ #
-        deep_stages = list(range(num_pool_layers - 2, num_pool_layers))  # [2,3]
-        for idx in deep_stages:
-            _to_dlka(self.down_sample_layers[idx])
-
-        # ------------------------------------------------------------------ #
-        # ❷ 병목(conv) 치환
-        # ------------------------------------------------------------------ #
-        _to_dlka(self.conv)
-
-        # ※ self.up_conv / right_block 들은 건드리지 않음 ⇒ 디코더는 Conv 유지
+        self._dlka_applied = any(isinstance(m, DLKAConvBlock) for m in self.modules())

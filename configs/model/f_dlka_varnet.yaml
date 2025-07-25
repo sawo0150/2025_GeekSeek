@@ -9,10 +9,11 @@ variant: "dlka"
 
 # 각 cascade 단계별 블록 수
 #   [ DLKA-UNet 블록, 일반 Feature 블록, 이미지-공간 VarNet 블록 ]
-cascade_counts: [6, 0, 6]        # default
+cascade_counts: [3, 3, 6]        # default
 
 # ───────── Feature encoder/decoder & U-Net 설정 ─────────
-chans: 9                         # feature channels
+feature_chans: 9                 # encoder/decoder 내부 채널 수
+unet_chans:    32                # UNet(Feature-Processor) base 채널 수
 pools: 4                          # UNet down/up levels
 
 # ───────── Sensitivity-map UNet ─────────
@@ -47,3 +48,6 @@ crop_size: none             # (H,W) used inside feature-space DC
 # (4+5+4,9,8) : checkpointing O : 6284, 예상시간 : 1epoch : 3시간 
 # (5+7+0,9,8) : checkpointing O : 6271
 # (6+0+6,9,8) : checkpointing O : 6147
+
+
+# (3+3+6,9,8) : checkpointing O : 7166
