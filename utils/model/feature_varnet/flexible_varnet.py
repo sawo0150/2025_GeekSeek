@@ -241,7 +241,7 @@ class FlexibleCascadeVarNet(nn.Module):
 
             _add(
                 PSFVarNetBlock, cascade_counts[0],
-                fp_cls=DLKADeepUnet2d,
+                fp_cls=LKSADeepUnet2d,
                 fp_kw=dict(
                     in_chans=enc.feature_chans,
                     out_chans=enc.feature_chans,
@@ -253,7 +253,7 @@ class FlexibleCascadeVarNet(nn.Module):
             )
             _add(
                 FeatureVarNetBlock, cascade_counts[1],
-                fp_cls=DLKADeepUnet2d,
+                fp_cls=LKSADeepUnet2d,
                 fp_kw=dict(
                     in_chans=enc.feature_chans,
                     out_chans=enc.feature_chans,
