@@ -15,7 +15,7 @@ from utils.common.utils import center_crop
 from .utils import sens_reduce, sens_expand, FeatureImage
 from .modules import FeatureEncoder, FeatureDecoder, NormStats
 from .blocks import FeatureVarNetBlock, AttentionFeatureVarNetBlock, VarNetBlock, PSFVarNetBlock
-from .modules import Unet2d, NormUnet, SensitivityModel, DLKAUnet2d, DLKADeepUnet2d
+from .modules import Unet2d, NormUnet, SensitivityModel, DLKAUnet2d, DLKADeepUnet2d, LKSADeepUnet2d
 from .attention import AttentionPE
 from typing import List, NamedTuple, Optional, Tuple
 import math
@@ -189,7 +189,7 @@ class FlexibleCascadeVarNet(nn.Module):
             # )
             _add(
                 FeatureVarNetBlock, cascade_counts[0],
-                fp_cls=DLKADeepUnet2d,
+                fp_cls=LKSADeepUnet2d,
                 fp_kw=dict(
                     in_chans=enc.feature_chans,
                     out_chans=enc.feature_chans,

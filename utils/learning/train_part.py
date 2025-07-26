@@ -54,6 +54,7 @@ def train_epoch(args, epoch, model, data_loader, optimizer, scheduler,
     # for n,m in model.named_modules():
     #     if isinstance(m, DLKAConvBlock): print("DLKA at", n)
     # for n, p in model.named_parameters(): print(n, p.numel())
+    # torch.autograd.set_detect_anomaly(True)
 
     model.train()
     # reset peak memory counter at the start of each epoch
@@ -538,7 +539,13 @@ def train(args):
                                      domain_filter=getattr(args, "domain_filter", None),
     )
     
-    val_loss_log = np.empty((0, 2))
+    # ▲ Resume 시 기존 val_loss_log를 불러와 이어서 기록
+    val_loss_log_file = os.path.join(args.val_loss_dir, "val_loss_log.npy")
+    if getattr(args, 'resume_checkpoint', None) and os.path.exists(val_loss_log_file):
+        val_loss_log = np.load(val_loss_log_file)
+        print(f"[Resume] 기존 val_loss_log 불러옴, shape={val_loss_log.shape}")
+    else:
+        val_loss_log = np.empty((0, 2))
 
     for epoch in range(start_epoch, args.num_epochs):
         MetricLog_train = MetricAccumulator("train")

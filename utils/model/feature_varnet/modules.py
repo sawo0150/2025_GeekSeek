@@ -12,6 +12,7 @@ from fastmri.fftc import fft2c_new as fft2c
 from fastmri.fftc import ifft2c_new as ifft2c
 
 from .deformable_LKA import deformable_LKA_Attention
+from .LSKA import Attention as LSKA_Attention           # ⭐️ LSKA Attention
 
 class NormStats(nn.Module):
     # def forward(self, data: Tensor) -> Tuple[Tensor, Tensor]:
@@ -713,3 +714,95 @@ class DLKADeepUnet2d(Unet2d):
         # ❸ debug 플래그 – DLKA 블록 삽입 여부 확인용
         # ------------------------------------------------------------------ #
         self._dlka_applied = any(isinstance(m, DLKAConvBlock) for m in self.modules())
+
+
+
+# ------------------------------------------------------------------ #
+# ① LSKAConvBlock - ConvBlock → Norm → LSKA → LeakyReLU
+# ------------------------------------------------------------------ #
+class LSKAConvBlock(nn.Module):
+    """
+    Conv-Norm 후 LSKA Attention(커널 k_size 기본 7) 을 적용한 경량 블록.
+    기존 DLKAConvBlock 과 동일한 인터페이스로 동작한다.
+    """
+    def __init__(self,
+                 in_chans:  int,
+                 out_chans: int,
+                 drop_prob: float = 0.0,
+                 k_size:    int   = 7):
+        super().__init__()
+        self.conv = nn.Conv2d(in_chans, out_chans, 3, 1, 1, bias=False)
+        self.norm = nn.InstanceNorm2d(out_chans)
+        self.attn = LSKA_Attention(out_chans, k_size)   # ⭐️ LSKA
+        self.act  = nn.LeakyReLU(0.2, inplace=True)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.conv(x)
+        x = self.norm(x)
+        x = self.attn(x)
+        x = self.act(x)
+        return x
+
+# ------------------------------------------------------------------ #
+# ② LKSAUnet2d – 기존 Unet2d 의 ConvBlock 을 LSKAConvBlock 으로 전부 교체
+# ------------------------------------------------------------------ #
+class LKSAUnet2d(Unet2d):
+    """모든 ConvBlock 을 LSKAConvBlock 으로 치환한 UNet2d."""
+    def __init__(self, *a, k_size: int = 7, **kw):
+        super().__init__(*a, **kw)
+
+        def _replace(module: nn.Module):
+            for name, m in module.named_children():
+                if isinstance(m, ConvBlock):
+                    setattr(module, name,
+                            LSKAConvBlock(m.in_chans,
+                                          m.out_chans,
+                                          m.drop_prob,
+                                          k_size=k_size))
+                else:
+                    _replace(m)
+        _replace(self)
+
+# ------------------------------------------------------------------ #
+# ③ LKSADeepUnet2d – 인코더 깊은 E2·E3 & bottleneck 만 LSKAConvBlock 적용
+# ------------------------------------------------------------------ #
+class LKSADeepUnet2d(Unet2d):
+    """
+    인코더의 Stage-2,3(E2,E3)와 bottleneck(conv) 에만 LSKAConvBlock 적용.
+    나머지 레이어는 원본 ConvBlock 유지 → 연산/메모리 과다 증가 방지.
+    """
+    def __init__(self,
+                 in_chans: int,
+                 out_chans: int,
+                 chans: int = 32,
+                 num_pool_layers: int = 4,
+                 drop_prob: float = 0.0,
+                 output_bias: bool = False,
+                 k_size: int = 7):
+        super().__init__(in_chans, out_chans, chans,
+                         num_pool_layers, drop_prob, output_bias)
+
+        def _replace_recursive(module: nn.Module, cur_depth: int):
+            """
+            depth: 0 → E0, 1 → E1, 2 → E2, 3 → E3 …
+            """
+            # ① 현재 노드의 left_block 확인
+            if hasattr(module, "left_block") and isinstance(module.left_block, ConvBlock):
+                if cur_depth >= num_pool_layers - 2:           # E2, E3
+                    lksa_blk = LSKAConvBlock(
+                        module.left_block.in_chans,
+                        module.left_block.out_chans,
+                        module.left_block.drop_prob,
+                        k_size=k_size,
+                    )
+                    setattr(module, "left_block", lksa_blk)
+            # ② child 가 있으면 계속 내려가기
+            if hasattr(module, "child") and isinstance(module.child, nn.Module):
+                _replace_recursive(module.child, cur_depth + 1)
+
+        # 👉 실제 치환 실행
+        _replace_recursive(self.layer, cur_depth=0)
+
+                    
+        self._lksa_applied = any(isinstance(m, LSKAConvBlock) for m in self.modules())
+        print("self._lksa_applied : ", self._lksa_applied)

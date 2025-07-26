@@ -56,3 +56,4 @@ crop_size: [640, 640]
 # ---- 여기까지 최선...?
 
 # (9,9,8) : checkpointing O : 7146
+# (10,9,8) : checkpointing O : 7349
