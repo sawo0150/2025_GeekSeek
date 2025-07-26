@@ -11,6 +11,7 @@ class LSKA(nn.Module):
         super().__init__()
 
         self.k_size = k_size
+        self.act   = nn.Sigmoid()  # 또는 torch.tanh / clamp
 
         if k_size == 7:
             self.conv0h = nn.Conv2d(dim, dim, kernel_size=(1, 3), stride=(1,1), padding=(0,(3-1)//2), groups=dim)
@@ -53,6 +54,7 @@ class LSKA(nn.Module):
         attn = self.conv_spatial_h(attn)
         attn = self.conv_spatial_v(attn)
         attn = self.conv1(attn)
+        attn = self.act(self.conv1(attn))     # **0 ~ 1로 바운드**
         return u * attn
 
 
