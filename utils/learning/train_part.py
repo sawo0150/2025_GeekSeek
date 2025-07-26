@@ -513,6 +513,11 @@ def train(args):
 
     # ▸ 2. AMP scaler (옵션)
     scaler = GradScaler(enabled=amp_enabled)
+    # Resume 시 GradScaler 상태 복원
+    if getattr(args, 'resume_checkpoint', None) and 'scaler' in ckpt:
+        scaler.load_state_dict(ckpt['scaler'])
+        print(f"[Resume] Loaded GradScaler state")
+
 
     print(args.data_path_train)
     print(args.data_path_val)
@@ -608,6 +613,7 @@ def train(args):
             'model': model.state_dict(),
             'optimizer': optimizer.state_dict(),
             "scheduler": scheduler.state_dict() if scheduler is not None else None,
+            'scaler': scaler.state_dict(),                  # ← 추가
             'best_val_ssim': best_val_ssim,
             'best_val_loss': best_val_loss,
             'exp_dir': str(args.exp_dir),

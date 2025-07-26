@@ -35,4 +35,4 @@ Epoch[ 0/30]/:   0%|                         | 0/9874 [00:00<?, ?it/s]/home/swpa
   with autocast(enabled=amp_enabled):
 /home/swpants05/Desktop/2025_FastMri/2025_GeekSeek/utils/model/feature_varnet/blocks.py:197: UserWarning: where received a uint8 condition tensor. This behavior is deprecated and will be removed in a future version of PyTorch. Use a boolean condition instead. (Triggered internally at /pytorch/aten/src/ATen/native/TensorCompare.cpp:611.)
   torch.where(
-Epoch[ 0/30]/:  10%| | 977/9874 [11:37<1:53:11,  1.31it/s, loss=0.0674
+Epoch[ 0/30]/:  23%|▏| 2261/9874 [26:47<1:19:54,  1.59it/s, loss=0.088
