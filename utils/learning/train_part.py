@@ -54,6 +54,7 @@ def train_epoch(args, epoch, model, data_loader, optimizer, scheduler,
     # for n,m in model.named_modules():
     #     if isinstance(m, DLKAConvBlock): print("DLKA at", n)
     # for n, p in model.named_parameters(): print(n, p.numel())
+    # torch.autograd.set_detect_anomaly(True)
 
     model.train()
     # reset peak memory counter at the start of each epoch
@@ -512,6 +513,11 @@ def train(args):
 
     # ▸ 2. AMP scaler (옵션)
     scaler = GradScaler(enabled=amp_enabled)
+    # Resume 시 GradScaler 상태 복원
+    if getattr(args, 'resume_checkpoint', None) and 'scaler' in ckpt:
+        scaler.load_state_dict(ckpt['scaler'])
+        print(f"[Resume] Loaded GradScaler state")
+
 
     print(args.data_path_train)
     print(args.data_path_val)
@@ -538,7 +544,13 @@ def train(args):
                                      domain_filter=getattr(args, "domain_filter", None),
     )
     
-    val_loss_log = np.empty((0, 2))
+    # ▲ Resume 시 기존 val_loss_log를 불러와 이어서 기록
+    val_loss_log_file = os.path.join(args.val_loss_dir, "val_loss_log.npy")
+    if getattr(args, 'resume_checkpoint', None) and os.path.exists(val_loss_log_file):
+        val_loss_log = np.load(val_loss_log_file)
+        print(f"[Resume] 기존 val_loss_log 불러옴, shape={val_loss_log.shape}")
+    else:
+        val_loss_log = np.empty((0, 2))
 
     for epoch in range(start_epoch, args.num_epochs):
         MetricLog_train = MetricAccumulator("train")
@@ -601,6 +613,7 @@ def train(args):
             'model': model.state_dict(),
             'optimizer': optimizer.state_dict(),
             "scheduler": scheduler.state_dict() if scheduler is not None else None,
+            'scaler': scaler.state_dict(),                  # ← 추가
             'best_val_ssim': best_val_ssim,
             'best_val_loss': best_val_loss,
             'exp_dir': str(args.exp_dir),

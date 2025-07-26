@@ -3,7 +3,7 @@ checkpointing: false        # gradient_checkpoint
 accum_steps:   10            # gradient_accumulation (1이면 이 기능 끄는거임.)
 
 grad_clip:           # ⬅︎ 새 섹션
-  enable:   false    # true → clipping 실행, false → 끔
+  enable:   true    # true → clipping 실행, false → 끔
   max_norm: 1.0      # torch.nn.utils.clip_grad_norm_ 에 전달
   norm_type: 2       # 2-norm (∞-norm 쓰려면 0 또는 inf)
 
@@ -13,7 +13,7 @@ grad_clip:           # ⬅︎ 새 섹션
 #                - steps: 10  # 사용할 accum_steps
 #   ※ 필요에 맞게 구간을 추가/수정하세요.
 grad_accum_scheduler:
-  enable: false
+  enable: true
   milestones:
     # 초기 탐색
     - epoch: 0
