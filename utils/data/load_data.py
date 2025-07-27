@@ -3,6 +3,7 @@
 import h5py, re
 import random
 import torch
+import torch.nn.functional as F
 import numpy as np
 from torch.utils.data import Dataset, DataLoader, default_collate, BatchSampler
 from hydra.utils import instantiate
@@ -18,6 +19,28 @@ except ImportError:
 from utils.data.transforms import DataTransform
 from utils.data.transform_wrapper import TransformWrapper
 from utils.data.sampler import GroupByCoilBatchSampler
+
+def padding_collate_fn(batch):
+    items = list(zip(*batch))
+    processed_items = []
+    for item_list in items:
+        elem = item_list[0]
+        if isinstance(elem, torch.Tensor) and elem.dim() > 1:
+            max_h = max(t.shape[-2] for t in item_list)
+            max_w = max(t.shape[-1] for t in item_list)
+            padded_tensors = []
+            for tensor in item_list:
+                h, w = tensor.shape[-2:]
+                pad_h, pad_w = max_h - h, max_w - w
+                padding = (pad_w // 2, pad_w - pad_w // 2, pad_h // 2, pad_h - pad_h // 2)
+                padded_tensors.append(F.pad(tensor, padding, "constant", 0))
+            processed_items.append(torch.stack(padded_tensors, 0))
+        else:
+            try:
+                processed_items.append(default_collate(item_list))
+            except (TypeError, RuntimeError):
+                processed_items.append(item_list)
+    return tuple(processed_items)
 
 class MultiCompose:
     def __init__(self, transforms):
@@ -69,14 +92,24 @@ class SliceData(Dataset):
             if isinstance(self.target_key, str) and self.target_key in hf: return hf[self.target_key].shape[0]
             return hf[next(iter(hf.keys()))].shape[0]
     def __len__(self): return len(self.kspace_examples)
+    
     @torch.no_grad()
     def _get_cat_with_classifier(self, kspace_data):
         if self.classifier is None: return "unknown", -1
         self.classifier.eval()
-        kspace_tensor = torch.from_numpy(kspace_data).unsqueeze(0).to(self.device)
+        
+        # [최종 수정] kspace_data(numpy)를 올바른 (B, C, H, W, 2) 텐서로 변환
+        # 1. numpy complex -> torch complex
+        kspace_complex = torch.from_numpy(kspace_data)
+        # 2. torch complex -> torch real with shape (..., 2)
+        kspace_real = torch.view_as_real(kspace_complex)
+        # 3. Add batch dimension and send to device
+        kspace_tensor = kspace_real.unsqueeze(0).to(self.device)
+
         logits = self.classifier(kspace_tensor)
         pred_idx = torch.argmax(logits, dim=1).item()
         return INV_DOMAIN_MAP.get(pred_idx, "unknown"), pred_idx
+
     def __getitem__(self, i):
         kspace_fname, dataslice, cat = self.kspace_examples[i]
         with h5py.File(kspace_fname, "r") as hf:
@@ -127,7 +160,6 @@ def create_data_loaders(data_path, args, shuffle=False, isforward=False, augment
         raw_ds = DomainSubset(raw_ds, domain_filter)
 
     dup_cfg = getattr(args, "maskDuplicate", {"enable": False})
-    # [FIX] for_classifier가 True일 때는 DuplicateMaskDataset을 적용하지 않도록 조건 추가
     if dup_cfg.get("enable", False) and not isforward and is_train and not for_classifier:
         cfg_clean = {k: v for k, v in dup_cfg.items() if k != "enable"}
         duped_ds = instantiate(OmegaConf.create(cfg_clean), base_ds=raw_ds, _recursive_=False)
@@ -136,14 +168,16 @@ def create_data_loaders(data_path, args, shuffle=False, isforward=False, augment
 
     data_storage = TransformWrapper(duped_ds, transform_chain)
     
-    base_collate_fn = instantiate(args.collator, _recursive_=False)
-    def prompt_collate_fn(batch):
-        domain_indices = [item[-1] if len(item) > 7 else -1 for item in batch]
-        base_items = [item[:-1] if len(item) > 7 else item for item in batch]
-        collated_base = base_collate_fn(base_items)
-        return (*collated_base, torch.tensor(domain_indices, dtype=torch.long))
-
-    collate_fn = default_collate if isforward else prompt_collate_fn
+    if isforward:
+        collate_fn = padding_collate_fn
+    else:
+        base_collate_fn = instantiate(args.collator, _recursive_=False)
+        def prompt_collate_fn(batch):
+            domain_indices = [item[-1] if len(item) > 7 else -1 for item in batch]
+            base_items = [item[:-1] if len(item) > 7 else item for item in batch]
+            collated_base = base_collate_fn(base_items)
+            return (*collated_base, torch.tensor(domain_indices, dtype=torch.long))
+        collate_fn = prompt_collate_fn
 
     batch_size = batch_size_override if batch_size_override else (args.val_batch_size if not is_train else args.batch_size)
     num_workers = args.num_workers

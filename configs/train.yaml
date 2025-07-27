@@ -3,7 +3,7 @@
 defaults:
   - _self_
   - model: f_dlka_varnet   # 모델 설정  varnet_sweep2 or fivarnet or f_dlka_varnet or f_psf_varnet
-  - data: local_sangwonDesktop         # 데이터 경로 설정
+  - data: local_gpu         # 데이터 경로 설정
   - LRscheduler: ExponentialLR        # ⬅️  추가 - https://gaussian37.github.io/dl-pytorch-lr_scheduler/참고
   - LossFunction: SSIM+L1
   - training: base_me          # base or vessl_vramMin or base_sw or base_me
@@ -25,7 +25,7 @@ corner_size : 16
 
 # === 공통 학습 하이퍼파라미터 ===
 GPU_NUM: 0
-batch_size: 1
+batch_size: 4
 val_batch_size: 1     # 검증 배치 크기 (추가)
 num_epochs: ${max_epochs} # 실제 돌아가는 epoch
 max_epochs : 30   # aug용 max epoch (domain train의 block training 때문에 넣음)
@@ -33,7 +33,7 @@ warmup_epochs : 3
 lr: 1e-3
 report_interval: 5000
 seed: 430
-num_workers: 0
+num_workers: 6
 
 exp_name : fivarnet_test
 

@@ -45,13 +45,6 @@ except ImportError:
 def train_epoch(args, epoch, model, data_loader, optimizer, scheduler,
                 loss_type, ssim_metric, metricLog_train,
                 scaler, amp_enabled, use_deepspeed, accum_steps):
-    # print(sum(p.numel() for p in model.parameters()))
-    # from utils.model.feature_varnet.modules import DLKAConvBlock
-    # for n,m in model.named_modules():
-    #     if isinstance(m, DLKAConvBlock): print("DLKA at", n)
-    # for n, p in model.named_parameters(): print(n, p.numel())
-    # torch.autograd.set_detect_anomaly(True)
-
     model.train()
     torch.cuda.reset_peak_memory_stats()
 
@@ -68,11 +61,16 @@ def train_epoch(args, epoch, model, data_loader, optimizer, scheduler,
     is_prompt_model = "Prompt" in model.__class__.__name__
 
     for iter_num, data in pbar:
-        if is_prompt_model:
+        # [MERGE] 유연한 데이터 언패킹 (현재 버전 유지)
+        if len(data) == 8:
             mask, kspace, target, maximum, fnames, _, cats, domain_indices = data
-            domain_indices = domain_indices.cuda(non_blocking=True)
-        else:
+            if is_prompt_model:
+                domain_indices = domain_indices.cuda(non_blocking=True)
+        elif len(data) == 7:
             mask, kspace, target, maximum, fnames, _, cats = data
+            domain_indices = None
+        else:
+            raise ValueError(f"Unexpected data batch length: {len(data)}")
 
         mask = mask.cuda(non_blocking=True)
         kspace = kspace.cuda(non_blocking=True)
@@ -128,18 +126,18 @@ def train_epoch(args, epoch, model, data_loader, optimizer, scheduler,
         total_loss += sum(loss_vals)
         total_slices += len(loss_vals)
 
-        batch_mean = sum(loss_vals) / len(loss_vals)
+        batch_mean = sum(loss_vals) / len(loss_vals) if len(loss_vals) > 0 else 0
         pbar.set_postfix(loss=f"{batch_mean:.4g}")
 
         for lv, sv, cat in zip(loss_vals, ssim_vals, cats):
             metricLog_train.update(lv, sv, [cat])
 
         del output, current_loss, loss, loss_vals, ssim_loss_vals, ssim_vals, mask, kspace, target, maximum
-        if is_prompt_model: del domain_indices
+        if domain_indices is not None: del domain_indices
         torch.cuda.empty_cache()
 
     epoch_time = time.perf_counter() - start_iter
-    return total_loss / total_slices, epoch_time
+    return total_loss / total_slices if total_slices > 0 else 0, epoch_time
 
 
 def validate(args, model, data_loader, acc_val, epoch, loss_type, ssim_metric):
@@ -149,22 +147,22 @@ def validate(args, model, data_loader, acc_val, epoch, loss_type, ssim_metric):
     start = time.perf_counter()
     total_loss, total_ssim, n_slices = 0.0, 0.0, 0
     
-    # [FIX] train_epoch과 동일하게, tqdm이 enumerate(data_loader)를 감싸도록 수정합니다.
     pbar = tqdm(enumerate(data_loader), total=len(data_loader), ncols=90, leave=False, desc=f"Val  [{epoch:2d}/{args.num_epochs}]")
     is_prompt_model = "Prompt" in model.__class__.__name__
 
     with torch.no_grad():
         for idx, data in pbar:
-            # [FIX] 데이터 묶음의 길이를 확인하여 유연하게 언패킹합니다.
+            # [MERGE] 유연한 데이터 언패킹 (현재 버전 유지)
             if len(data) == 8:
                 mask, kspace, target, maximum, fnames, slices, cats, domain_indices = data
-                domain_indices = domain_indices.cuda(non_blocking=True)
+                if is_prompt_model:
+                    domain_indices = domain_indices.cuda(non_blocking=True)
             elif len(data) == 7:
                 mask, kspace, target, maximum, fnames, slices, cats = data
                 domain_indices = None
             else:
                 raise ValueError(f"Unexpected data batch length: {len(data)}")
-                
+
             kspace = kspace.cuda(non_blocking=True)
             mask = mask.cuda(non_blocking=True)
             target = target.cuda(non_blocking=True)
@@ -261,8 +259,7 @@ def train(args, classifier=None):
     else:
         sched_cfg_raw = getattr(args, "LRscheduler", None)
         if sched_cfg_raw is not None:
-             clean_dict = {k: v for k, v in sched_cfg_raw.items() if not k.startswith("_")}
-             scheduler = instantiate(OmegaConf.create(clean_dict), optimizer=optimizer)
+            scheduler = instantiate(OmegaConf.create(sched_cfg_raw), optimizer=optimizer)
 
     if use_deepspeed:
         import deepspeed
@@ -275,71 +272,30 @@ def train(args, classifier=None):
         cfg_clean = OmegaConf.create({k: v for k, v in mask_aug_cfg.items() if k != "enable"})
         mask_augmenter = instantiate(cfg_clean)
 
+    # [MERGE] GitHub 버전의 완전한 Resume 로직을 적용합니다.
     start_epoch, best_val_loss, best_val_ssim, val_loss_history = 0, float('inf'), 0.0, []
+    scaler = GradScaler(enabled=amp_enabled)
+
     if getattr(args, 'resume_checkpoint', None):
+        ckpt_path = getattr(args, 'resume_checkpoint')
+        if os.path.exists(ckpt_path):
+            ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
+            model.load_state_dict(ckpt['model'])
+            optimizer.load_state_dict(ckpt['optimizer'])
+            best_val_loss = ckpt.get('best_val_loss', float('inf'))
+            best_val_ssim = ckpt.get('best_val_ssim', 0.0)
+            start_epoch = ckpt.get('epoch', 0)
+            val_loss_history = ckpt.get('val_loss_history', [])
+            if scheduler and ckpt.get("scheduler"): scheduler.load_state_dict(ckpt["scheduler"])
+            if scaler and ckpt.get('scaler'): scaler.load_state_dict(ckpt['scaler'])
+            if augmenter and hasattr(augmenter, 'val_loss_history'): augmenter.val_loss_history.extend(val_loss_history)
+            if mask_augmenter and hasattr(mask_augmenter, 'val_hist'): mask_augmenter.val_hist.extend(val_loss_history)
+            print(f"[Resume] Loaded '{ckpt_path}'")
 
-        ckpt = torch.load(args.resume_checkpoint, map_location=device, weights_only=False)
-        model.load_state_dict(ckpt['model'])
-        optimizer.load_state_dict(ckpt['optimizer'])
-        best_val_loss = ckpt.get('best_val_loss', float('inf'))
-        best_val_ssim = ckpt.get('best_val_ssim', 0.0)
-        start_epoch = ckpt.get('epoch', 0)
-        val_loss_history = ckpt.get('val_loss_history', []) # 체크포인트에서 기록 복원
-        print(f"[Resume] Loaded '{args.resume_checkpoint}' → epoch {start_epoch}, best_val_loss={best_val_loss:.4f}")
-        # 재개 시, augmenter의 상태도 복원
-        # --- resume 영역 ---
-        if scheduler is not None and ckpt.get("scheduler") is not None:
-            scheduler.load_state_dict(ckpt["scheduler"])
-        if augmenter:
-            augmenter.val_loss_history.clear()
-            augmenter.val_loss_history.extend(val_loss_history)
-            print(f"[Resume] Augmenter val_loss history 복원 완료 ({len(val_loss_history)}개 항목)")
-        if mask_augmenter:
-            mask_augmenter.val_hist.clear()
-            mask_augmenter.val_hist.extend(val_loss_history)
-            print(f"[Resume] MaskAugmenter val_loss history 복원 완료 ({len(val_loss_history)}개 항목)")
-
-
-    # ▸ 2. AMP scaler (옵션)
-    scaler = GradScaler(enabled=amp_enabled)
-    # Resume 시 GradScaler 상태 복원
-    if getattr(args, 'resume_checkpoint', None) and 'scaler' in ckpt:
-        scaler.load_state_dict(ckpt['scaler'])
-        print(f"[Resume] Loaded GradScaler state")
-
-
-    print(args.data_path_train)
-    print(args.data_path_val)
-
-
-    scaler = GradScaler(enabled=amp_enabled)
-    
     _raw_eval = getattr(args, "evaluation", {})
     eval_cfg = _raw_eval.get("evaluation", _raw_eval)
     lb_enable = eval_cfg.get("enable", False)
-
-    lb_every  = eval_cfg.get("every_n_epochs", 999_999)   # 기본 매우 크게
-
-    print(f"[Hydra-eval] {eval_cfg}")
-    print(f"[Hydra-eval] lb_enable={lb_enable}, lb_every={lb_every}")
-
-    # train_loader = create_data_loaders(data_path = args.data_path_train, args = args, shuffle=True) # 매 에폭마다 생성 예정
-    val_loader = create_data_loaders(data_path=args.data_path_val, 
-                                     args=args, 
-                                     augmenter=None,
-                                     mask_augmenter=None,
-                                     is_train=False,     # ★ val/test는 False)
-                                     domain_filter=getattr(args, "domain_filter", None),
-    )
-    
-    # ▲ Resume 시 기존 val_loss_log를 불러와 이어서 기록
-    val_loss_log_file = os.path.join(args.val_loss_dir, "val_loss_log.npy")
-    if getattr(args, 'resume_checkpoint', None) and os.path.exists(val_loss_log_file):
-        val_loss_log = np.load(val_loss_log_file)
-        print(f"[Resume] 기존 val_loss_log 불러옴, shape={val_loss_log.shape}")
-    else:
-        val_loss_log = np.empty((0, 2))
-
+    lb_every = eval_cfg.get("every_n_epochs", 999_999)
 
     val_loader = create_data_loaders(data_path=args.data_path_val, args=args, is_train=False, classifier=classifier)
     
@@ -353,7 +309,8 @@ def train(args, classifier=None):
         if augmenter: augmenter.update_state(current_epoch=epoch, val_loss=last_val_loss)
         if mask_augmenter: mask_augmenter.update_state(current_epoch=epoch, val_loss=last_val_loss)
 
-        train_loader = create_data_loaders(data_path=args.data_path_train, args=args, shuffle=True, augmenter=augmenter, mask_augmenter=mask_augmenter, is_train=True, classifier=None)
+        # [MERGE] classifier 전달 로직 (현재 버전 유지)
+        train_loader = create_data_loaders(data_path=args.data_path_train, args=args, shuffle=True, augmenter=augmenter, mask_augmenter=mask_augmenter, is_train=True, classifier=classifier if is_prompt_model else None)
 
         accum_steps_epoch = _accum_steps_for_epoch(epoch)
         if accum_steps_epoch != accum_steps:
@@ -367,26 +324,22 @@ def train(args, classifier=None):
         is_new_best = val_ssim > best_val_ssim
         best_val_loss = min(best_val_loss, val_loss)
         best_val_ssim = max(best_val_ssim, val_ssim)
-
+        
+        # [MERGE] GitHub 버전의 완전한 Checkpoint 저장 로직을 적용합니다.
         checkpoint = {
-
-            'epoch': epoch + 1,
-            'args': args,
-            'model': model.state_dict(),
-            'optimizer': optimizer.state_dict(),
-            "scheduler": scheduler.state_dict() if scheduler is not None else None,
-            'scaler': scaler.state_dict(),                  # ← 추가
-            'best_val_ssim': best_val_ssim,
-            'best_val_loss': best_val_loss,
-            'exp_dir': str(args.exp_dir),
-            'val_loss_history': val_loss_history 
+            'epoch': epoch + 1, 'args': args, 'model': model.state_dict(),
+            'optimizer': optimizer.state_dict(), 'scheduler': scheduler.state_dict() if scheduler is not None else None,
+            'scaler': scaler.state_dict(),
+            'best_val_ssim': best_val_ssim, 'best_val_loss': best_val_loss,
+            'exp_dir': str(args.exp_dir), 'val_loss_history': val_loss_history 
         }
         torch.save(checkpoint, args.exp_dir / 'model.pt')
         if is_new_best: shutil.copyfile(args.exp_dir / 'model.pt', args.exp_dir / 'best_model.pt')
 
         if scheduler and not use_deepspeed:
             if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau): scheduler.step(val_loss)
-            elif not isinstance(scheduler, (torch.optim.lr_scheduler.OneCycleLR, torch.optim.lr_scheduler.CyclicLR)): scheduler.step()
+            elif not isinstance(scheduler, (torch.optim.lr_scheduler.OneCycleLR, torch.optim.lr_scheduler.CyclicLR)): pass # Handled in train_epoch
+            else: scheduler.step()
 
         if getattr(args, "use_wandb", False) and wandb:
             MetricLog_train.log(epoch * dup_mul)
