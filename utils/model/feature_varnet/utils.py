@@ -99,5 +99,5 @@ class FeatureImage(NamedTuple):
     variances: Optional[Tensor] = None
     mask: Optional[Tensor] = None
     ref_kspace: Optional[Tensor] = None
-    beta: Optional[Tensor] = None
+    beta: Optional[Tensor] = None   # ← PSF offset look-up 테이블
     gamma: Optional[Tensor] = None

@@ -1,0 +1,53 @@
+# configs/model/dlka_varnet.yaml
+_target_: utils.model.feature_varnet.FlexibleCascadeVarNet
+# _target_: utils.model.feature_varnet.flexible_varnet.FlexibleCascadeVarNet
+
+# ────────────────────────────────────────────────────────────────
+# 모델 종류:  dlka  | psf | psf_dlka  중 선택
+# ────────────────────────────────────────────────────────────────
+variant: "dlka"
+
+# 각 cascade 단계별 블록 수
+#   [ DLKA-UNet 블록, 일반 Feature 블록, 이미지-공간 VarNet 블록 ]
+cascade_counts: [2, 4, 6]        # default
+
+# ───────── Feature encoder/decoder & U-Net 설정 ─────────
+feature_chans: 9                 # encoder/decoder 내부 채널 수
+unet_chans:    32                # UNet(Feature-Processor) base 채널 수
+pools: 4                          # UNet down/up levels
+
+# ───────── Sensitivity-map UNet ─────────
+sens_chans: 8
+sens_pools: 4
+mask_center: true
+
+# ───────── 훈련·추론 공통 하이퍼파라미터 ─────────
+kspace_mult_factor: 1e6           # scale k-space for stability
+# crop_size: [640, 640]             # (H,W) used inside feature-space DC
+crop_size: none             # (H,W) used inside feature-space DC
+
+# (DLKA 전용 값 없음. variant=="dlka"면 PSF 관련 파라미터는 무시됩니다)
+#psf_K: 8                         # [ignored]
+#psf_radius: 4                    # [ignored]
+#psf_exclude_center: true         # [ignored]
+
+
+# (crop 켰을때 - 640, 640)
+
+# (1+5+4,9,8) : checkpointing O : 8730
+# (1+5+6,9,8) : checkpointing O : 8754
+# (2+5+4,9,8) : checkpointing O : 8784, 예상시간 : 1epoch : 7시간 <-- 안될듯...
+# (7,9,8) : checkpointing O : 6861
+# (8,9,8) : checkpointing O : 7005
+
+
+# (crop 껐을때) + 맨 밑에 2 layer에만 DLKA 연산 적용
+
+# (1+5+4,9,8) : checkpointing O : 8730
+# (1+5+6,9,8) : checkpointing O : 6116 예상시간 : 1epoch : 2.5시간 
+# (4+5+4,9,8) : checkpointing O : 6284, 예상시간 : 1epoch : 3시간 
+# (5+7+0,9,8) : checkpointing O : 6271
+# (6+0+6,9,8) : checkpointing O : 6147
+
+
+# (3+3+6,9,8) : checkpointing O : 7166

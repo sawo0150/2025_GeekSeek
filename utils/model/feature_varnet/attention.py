@@ -97,3 +97,50 @@ class AttentionPE(nn.Module):
 
         return x + h_
 
+
+
+
+class PSFDeformableAttention(nn.Module):
+    """
+    • offsets 는  (B, H, W, K, 2)  평면좌표 [dy,dx]
+    • values   는  (B, C, H, W)
+    • PSF 테이블(psf_tbl)    : torch.LongTensor (B, H, W, K, 2) ― 고정 anchor
+    • δ(learnable_delta)    : nn.Parameter 동일 shape, 초기값 0
+    """
+    def __init__(self, in_chans: int, K: int = 8, radius: int = 4):
+        super().__init__()
+        self.in_chans, self.K, self.radius = in_chans, K, radius
+        self.to_qkv = nn.Conv2d(in_chans, in_chans * 3, 1, bias=False)
+        self.delta  = nn.Parameter(torch.zeros(1, 1, 1, K, 2))
+        self.proj   = nn.Conv2d(in_chans, in_chans, 1, bias=False)
+
+    @staticmethod
+    def _sample(v: Tensor, coord: Tensor) -> Tensor:
+        """grid_sample wrapper – v:(B,C,H,W), coord:(B,H,W,K,2) -1~1 공간"""
+        B,C,H,W = v.shape
+        # v_ = F.grid_sample(v, coord.view(B,H,W,-1,2).flatten(3,3),
+        #                    mode='bilinear', align_corners=True)          # (B,C,H*W*K)
+        # return v_.view(B,C,H,W,-1)                                       # (B,C,H,W,K)                                # (B,C,H,W,K)
+        K = coord.shape[3]
+        grid = coord.view(B, H, W * K, 2).to(v.dtype)   # (B,H,W*K,2)
+        v_ = F.grid_sample(v, grid, mode='bilinear', align_corners=True)  # (B,C,H,W*K)
+        return v_.view(B, C, H, W, K)                                     # (B,C,H,W,K)
+
+    def forward(self, x: Tensor, psf_tbl: Tensor) -> Tensor:
+        B,C,H,W = x.shape
+        q,k,v = self.to_qkv(x).chunk(3,1)                                # (B,C,H,W)
+        # 1) PSF anchor + learnable δ  (B,H,W,K,2)
+        # offsets = psf_tbl + torch.tanh(self.delta) * self.radius
+        offsets = psf_tbl.to(x.dtype) + torch.tanh(self.delta) * self.radius
+        # norm to [-1,1]
+        # norm = torch.tensor([H-1, W-1], device=x.device).view(1,1,1,1,2)
+        norm = torch.tensor([H-1, W-1], device=x.device, dtype=x.dtype).view(1,1,1,1,2)
+        grid  = offsets / norm * 2 - 1
+        # 2) sample
+        k_s = self._sample(k, grid)   # (B,C,H,W,K)
+        v_s = self._sample(v, grid)
+        # 3) attention weight
+        attn = (q.unsqueeze(-1) * k_s).sum(1, keepdim=True) * (C**-0.5)
+        attn = F.softmax(attn, dim=-1)
+        out  = (attn * v_s).sum(-1)                      # (B,C,H,W)
+        return x + self.proj(out)

@@ -2,11 +2,11 @@
 
 defaults:
   - _self_
-  - model: fivarnet_crop1   # 모델 설정  varnet_sweep2 or fivarnet
+  - model: f_dlka_varnet   # 모델 설정  varnet_sweep2 or fivarnet or f_dlka_varnet or f_psf_varnet
   - data: local_sangwonDesktop         # 데이터 경로 설정
   - LRscheduler: ExponentialLR        # ⬅️  추가 - https://gaussian37.github.io/dl-pytorch-lr_scheduler/참고
   - LossFunction: SSIM+L1
-  - training: base_sw          # base or vessl_vramMin or base_sw or base_me
+  - training: base_me          # base or vessl_vramMin or base_sw or base_me
   - early_stop: none    # 조기종료 기능 : early_stop or none
   - evaluation: leaderboard
   - optimizer: nadam          # ⬅️ 새로 추가  
@@ -26,16 +26,16 @@ corner_size : 16
 # === 공통 학습 하이퍼파라미터 ===
 GPU_NUM: 0
 batch_size: 1
-val_batch_size: 3     # 검증 배치 크기 (추가)
+val_batch_size: 1     # 검증 배치 크기 (추가)
 num_epochs: ${max_epochs} # 실제 돌아가는 epoch
 max_epochs : 30   # aug용 max epoch (domain train의 block training 때문에 넣음)
 warmup_epochs : 3
 lr: 1e-3
-report_interval: 50
+report_interval: 5000
 seed: 430
-num_workers: 4
+num_workers: 0
 
-exp_name : fivarnet(8,9,8)-crop(640,640)
+exp_name : fivarnet_test
 
 # these three are *required* by utils/data/load_data.py → create_data_loaders
 input_key:  kspace
@@ -49,4 +49,4 @@ wandb:
   max_vis_per_cat: 5        # epoch 마다 카테고리별 이미지 수 (0 → 안 올림)
 
   use_visLogging: true
-  use_receptiveField: true
+  use_receptiveField: false

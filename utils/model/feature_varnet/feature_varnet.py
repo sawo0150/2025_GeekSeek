@@ -66,7 +66,6 @@ class FIVarNet(nn.Module):
                 )
             )
         self.feat_cascades = nn.ModuleList(feat_blocks)
-        self.feat_cascades = nn.ModuleList(feat_blocks)
 
         self.image_cascades = nn.ModuleList(
             [VarNetBlock(NormUnet(chans, pools)) for _ in range(num_cascades)]
@@ -1080,4 +1079,5 @@ class E2EVarNet(nn.Module):
             kspace_pred = cascade(kspace_pred, masked_kspace, mask, sens_maps)
 
         return rss(complex_abs(ifft2c(kspace_pred)), dim=1)
+
 

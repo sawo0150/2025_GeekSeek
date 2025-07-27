@@ -23,7 +23,7 @@ grad_accum_scheduler:
       steps: ${training.accum_steps}
     # 세밀 튜닝: max_epochs - 5
     - epoch: ${calc:"${max_epochs} - 5"}
-      steps: 4
+      steps: 16
       
 # (cascade, chans, sens_chans)
 # deepspeed false (18,18,8), checkpoint O : 7000, 11056 (max_memory_allocated, max max_memory_reserved MB)

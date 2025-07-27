@@ -1,0 +1,26 @@
+# configs/model/psf_dlka_varnet.yaml
+_target_: utils.model.feature_varnet.FlexibleCascadeVarNet
+
+# ────────────────────────────────────────────────────────────────
+# variant = psf_dlka  ➜  [PSF+DLKA] → DLKA → 일반 Feature → VarNet
+# ────────────────────────────────────────────────────────────────
+variant: "psf_dlka"
+
+# [ psf+dlka_blks , dlka_blks , feat_blks , img_blks ]
+cascade_counts: [2, 2, 6, 6]
+
+feature_chans: 9                 # encoder/decoder 내부 채널 수
+unet_chans:    32                # UNet(Feature-Processor) base 채널 수
+pools: 4
+
+sens_chans: 8
+sens_pools: 4
+mask_center: true
+
+# ───────── PSF-guided attention 옵션 ─────────
+psf_K: 8                     # #anchor directions
+psf_radius: 4                # pixel radius
+psf_exclude_center: true     # remove central lobe from top-K
+
+kspace_mult_factor: 1e6
+crop_size: [640, 640]
