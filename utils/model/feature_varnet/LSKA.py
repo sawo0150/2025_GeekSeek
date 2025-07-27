@@ -54,7 +54,17 @@ class LSKA(nn.Module):
         attn = self.conv_spatial_h(attn)
         attn = self.conv_spatial_v(attn)
         attn = self.conv1(attn)
-        attn = self.act(self.conv1(attn))     # **0 ~ 1로 바운드**
+
+
+        # attn = self.act(attn)     # **0 ~ 1로 바운드**
+
+        # ── ② NaN 방지: 소프트-클램프 (fp16/32 안전 범위) ──
+        attn = torch.clamp(attn, -12.0, 12.0)   # |exp(±12)| < 1e5
+
+        # ── ③ tanh 로 Zero-center, 이후 0-1 게이트 스케일 ──
+        attn = torch.tanh(attn)                 # −1 ~ 1
+        attn = 0.5 * (attn + 1.0)               #  0 ~ 1
+
         return u * attn
 
 
