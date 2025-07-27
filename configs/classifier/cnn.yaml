@@ -1,0 +1,5 @@
+# configs/classifier/cnn.yaml
+_target_: utils.model.cnn.DomainClassifier
+in_chans: 1       # RSS 이미지는 1채널이므로 1로 변경해도 좋으나, 현재 cnn.py에서는 사용되지 않아 그대로 둬도 무방합니다.
+num_classes: 2    # [FIX] 4 -> 2로 변경
+base_chans: 16    # CNN 기본 채널 수

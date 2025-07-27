@@ -1,0 +1,13 @@
+# configs/model/prompt_varnet.yaml
+_target_: utils.model.prompt_varnet.PromptVarNet
+num_cascades: 8
+chans: 18
+pools: 4
+sens_chans: 8
+sens_pools: 4
+# �� Prompt-MR 관련 파라미터 추가
+num_domains: 2          # brain_x4, brain_x8, knee_x4, knee_x8
+prompt_embed_dim: 128   # 도메인 임베딩 벡터 차원
+mask_embed_dim: 16      # 마스크 임베딩 벡터 차원
+
+#6560 MB

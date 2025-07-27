@@ -1,0 +1,10 @@
+# configs/model/prompt_varnet_v2.yaml
+_target_: utils.model.prompt_varnet_v2.PromptVarNetV2
+
+num_cascades: 8
+chans: 32           # 논문과 유사하게 기본 채널 수를 늘려볼 수 있습니다.
+pools: 4
+sens_chans: 8
+sens_pools: 4
+num_domains: 2          # knee, brain
+prompt_embed_dim: 128   # 프롬프트 벡터 차원
