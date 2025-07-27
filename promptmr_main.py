@@ -23,12 +23,12 @@ for extra in ["utils/model", "utils/common", "utils/learning", "utils/data"]:
     if str(path) not in sys.path:
         sys.path.insert(1, str(path))
 
-# [PROMPT-MR] 필요한 모듈 임포트
+# 필요한 모듈 임포트
 from utils.learning.classifier_train_part import train_classifier
 from utils.learning.train_part import train as train_reconstructor
 from utils.common.utils import seed_fix
 
-# main.py의 _flatten_cfg_to_args 함수를 그대로 가져옵니다.
+# _flatten_cfg_to_args 함수는 이전 답변의 최종 버전과 동일하게 유지합니다.
 def _flatten_cfg_to_args(cfg: DictConfig) -> SimpleNamespace:
     container = OmegaConf.to_container(cfg, resolve=True)
     args = SimpleNamespace()
@@ -40,7 +40,7 @@ def _flatten_cfg_to_args(cfg: DictConfig) -> SimpleNamespace:
                         "optimizer", "compressor", "collator", "sampler",
                         "evaluation", "early_stop", "maskDuplicate", "maskAugment",
                         "aug", "centerCropPadding", "deepspeed", "classifier",
-                        "classifier_training" # 추가
+                        "classifier_training"
                         }
             if k == "grad_accum_scheduler" and isinstance(v, Mapping):
                 setattr(args, new_key, v)
@@ -48,7 +48,8 @@ def _flatten_cfg_to_args(cfg: DictConfig) -> SimpleNamespace:
                 continue
             if prefix == "" and k in PRESERVE and isinstance(v, Mapping):
                 setattr(args, k, v)
-                recurse("", v) if k in {"model", "data", "classifier"} else recurse(k, v)
+                # classifier를 특별 취급하지 않는 것이 핵심입니다.
+                recurse("", v) if k in {"model", "data"} else recurse(k, v)
             elif isinstance(v, Mapping):
                 recurse(new_key, v)
             else:
@@ -102,23 +103,20 @@ def main(cfg: DictConfig):
     # [PROMPT-MR] 파이프라인 시작
     # =========================================================================
 
-    # 4. 분류기 모델 인스턴스화
-    # cfg.classifier는 configs/classifier/cnn.yaml을 참조
-    classifier_model = hydra.utils.instantiate(cfg.classifier)
-    
-    # 5. 분류기 학습
-    # train_classifier 함수는 학습된 모델 객체를 반환
-    trained_classifier = train_classifier(args, classifier_model)
+    # 4. 분류기 학습
+    # [FIX] classifier_model을 여기서 인스턴스화하지 않습니다.
+    # [FIX] train_classifier 함수에 args 객체 하나만 전달하여, 호출과 정의를 일치시킵니다.
+    trained_classifier = train_classifier(args)
     trained_classifier.eval() # 평가 모드로 전환
 
-    # 6. 재구성 모델 학습
+    # 5. 재구성 모델 학습
     print("\n" + "="*80)
     print("PHASE 2: Training Reconstruction Model (PromptVarNet)")
     print("="*80)
     # train_reconstructor 함수에 학습된 분류기 객체를 전달
     train_reconstructor(args, classifier=trained_classifier)
 
-    # 7. 마무리
+    # 6. 마무리
     if args.use_wandb:
         wandb.finish()
 
