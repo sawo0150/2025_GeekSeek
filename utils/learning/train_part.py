@@ -35,7 +35,7 @@ from utils.logging.vis_logger import log_epoch_samples
 from utils.common.utils import save_reconstructions
 from utils.common.loss_function import SSIMLoss
 from utils.logging.receptive_field import log_receptive_field
-# [PROMPT-MR] leaderboard_eval_part 임포트 방식 변경에 대비
+
 try:
     from utils.learning.leaderboard_eval_part import run_leaderboard_eval
 except ImportError:
@@ -49,8 +49,7 @@ def train_epoch(args, epoch, model, data_loader, optimizer, scheduler,
     torch.cuda.reset_peak_memory_stats()
 
     len_loader = len(data_loader)
-    total_loss = 0.
-    total_slices = 0
+    total_loss, total_slices = 0., 0
 
     grad_clip_enabled  = getattr(args, "training_grad_clip_enable", False)
     grad_clip_max_norm = getattr(args, "training_grad_clip_max_norm", 1.0)
@@ -143,7 +142,8 @@ def validate(args, model, data_loader, acc_val, epoch, loss_type, ssim_metric):
     start = time.perf_counter()
     total_loss, total_ssim, n_slices = 0.0, 0.0, 0
     
-    pbar = tqdm(data_loader, total=len(data_loader), ncols=90, leave=False, desc=f"Val  [{epoch:2d}/{args.num_epochs}]")
+    # [FIX] train_epoch과 동일하게, tqdm이 enumerate(data_loader)를 감싸도록 수정합니다.
+    pbar = tqdm(enumerate(data_loader), total=len(data_loader), ncols=90, leave=False, desc=f"Val  [{epoch:2d}/{args.num_epochs}]")
     is_prompt_model = "Prompt" in model.__class__.__name__
 
     with torch.no_grad():
@@ -250,7 +250,7 @@ def train(args, classifier=None):
     else:
         sched_cfg_raw = getattr(args, "LRscheduler", None)
         if sched_cfg_raw is not None:
-             clean_dict = {k: v for k, v in sched_cfg_raw.items() if not k.startswith("_")} # filter internal keys
+             clean_dict = {k: v for k, v in sched_cfg_raw.items() if not k.startswith("_")}
              scheduler = instantiate(OmegaConf.create(clean_dict), optimizer=optimizer)
 
     if use_deepspeed:
