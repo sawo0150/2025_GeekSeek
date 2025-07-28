@@ -22,19 +22,19 @@ aug_exp_decay: 6.0            # 'exp' 타입일 때 지수 감쇠 상수
 #           ─ cf = center_fraction
 mask_specs:
   equispaced:   # ▸ EquiSpacedMaskFunc
-    prob: 0.4
+    prob: 0.25
     accel: [4, 8]
     cf:    [0.07, 0.10] #실제 학습 데이터 값을 통해 근사...
   equispaced_fraction:    # ▸ EquispacedMaskFractionFunc
-    prob: 0.3
+    prob: 0.25
     accel: [4, 8]
     cf:    [0.07, 0.10]
   random:   # ▸ RandomMaskFunc -- 무작위 샘플링
-    prob: 0.2   #   이 타입이 뽑힐 가중치 (전체 합으로 정규화)
+    prob: 0.25   #   이 타입이 뽑힐 가중치 (전체 합으로 정규화)
     accel: [4, 8]          # #   undersampling 배수 중 랜덤 선택
     cf:    [0.07, 0.10]    # #   center-fraction 실수 균등 샘플
   magic_fraction:   # ▸ MagicMaskFractionFunc
-    prob: 0.10
+    prob: 0.25
     accel: [4, 8]               # 단일 값
     cf:    [0.07, 0.10]            # 단일 값
 allow_any_combination: true   # accel 과 cf 를 교차 짝짓기 허용 여부

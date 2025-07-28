@@ -131,5 +131,3 @@ if __name__ == '__main__':
     print("="*10 + " Details " + "="*10)
     print("Leaderboard SSIM (acc4): {:.4f}".format(SSIM_acc4))
     print("Leaderboard SSIM (acc8): {:.4f}".format(SSIM_acc8))
-
-
