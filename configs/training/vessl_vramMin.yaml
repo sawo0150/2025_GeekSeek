@@ -23,7 +23,7 @@ grad_accum_scheduler:
       steps: ${training.accum_steps}
     # 세밀 튜닝: max_epochs - 5
     - epoch: ${calc:"${max_epochs} - 5"}
-      steps: 4
+      steps: 16
       
 deepspeed:
   enable:       false        # ← 스위치 - true or false

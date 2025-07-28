@@ -1,7 +1,0 @@
-# configs/evaluation/leaderboard.yaml  ─ 새 그룹
-evaluation:
-  enable:            true        # false면 완전 비활성
-  every_n_epochs:    1           # 5·10·20 … 자유  
-  batch_size:        8           # reconstruct용
-  leaderboard_root:  ${data.data_path_eval}
-  output_key:        reconstruction
