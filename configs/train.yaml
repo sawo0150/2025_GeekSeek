@@ -2,7 +2,7 @@
 
 defaults:
   - _self_
-  - model: f_dlka_varnet   # 모델 설정  varnet_sweep2 or fivarnet or f_dlka_varnet or f_psf_varnet
+  - model: small_varnet   # 모델 설정  varnet_sweep2 or fivarnet or f_dlka_varnet or f_psf_varnet
   - data: local_gpu         # 데이터 경로 설정
   - LRscheduler: ExponentialLR        # ⬅️  추가 - https://gaussian37.github.io/dl-pytorch-lr_scheduler/참고
   - LossFunction: SSIM+L1

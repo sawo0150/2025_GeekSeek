@@ -20,18 +20,30 @@ def test(args, model, data_loader, classifier=None):
 
     with torch.no_grad():
         for batch in tqdm(data_loader, desc=f"Reconstructing", ncols=90, leave=False):
-            if len(batch) == 8: # isforward=False for val set, returns 8
+            # [최종 수정] 9개, 8개, 7개, 6개 모든 케이스를 유연하게 처리
+            # isforward=True 모드에서는 9개 또는 6개(non-prompt)가 올 수 있습니다.
+            if len(batch) == 9: # promptmr + acc_idx
+                mask, kspace, _, _, fnames, slices, _, domain_indices, acc_indices = batch
+                domain_indices = domain_indices.cuda(non_blocking=True)
+                acc_indices = acc_indices.cuda(non_blocking=True)
+            elif len(batch) == 8: # (호환성 유지) acc_idx 없는 promptmr
                 mask, kspace, _, _, fnames, slices, _, domain_indices = batch
-            elif len(batch) == 7: # isforward=True for test set with prompt model
-                mask, kspace, _, _, fnames, slices, domain_indices = batch
-            else: # default test set, old model
+                domain_indices = domain_indices.cuda(non_blocking=True)
+                acc_indices = None
+            elif len(batch) == 6: # 일반 forward 모드
                 mask, kspace, _, _, fnames, slices = batch
-            
+                domain_indices = None
+                acc_indices = None
+            else:
+                 raise ValueError(f"Unexpected data batch length in test function: {len(batch)}")
+
             kspace = kspace.cuda(non_blocking=True)
             mask = mask.cuda(non_blocking=True)
             
-            if is_prompt_model:
-                domain_indices = domain_indices.cuda(non_blocking=True)
+            # [최종 수정] 모델 종류에 따라 필요한 인자를 정확히 전달
+            if "PromptFIVarNet" in model.__class__.__name__:
+                output = model(kspace, mask, domain_indices, acc_indices)
+            elif is_prompt_model:
                 output = model(kspace, mask, domain_indices)
             else:
                 output = model(kspace, mask)
@@ -60,8 +72,6 @@ def forward(args, classifier=None):
         
     checkpoint = torch.load(checkpoint_path, map_location='cpu', weights_only=False)
     
-    # [PROMPT-MR] DeepSpeed 등으로 인해 state_dict key가 다를 수 있어 유연하게 로드
-    # 예: 'module.sens_net.norm_unet.unet.down_sample_layers.0.0.weight' -> 'sens_net...'
     state_dict = checkpoint['model']
     if list(state_dict.keys())[0].startswith('module.'):
         state_dict = {k[7:]: v for k, v in state_dict.items()}

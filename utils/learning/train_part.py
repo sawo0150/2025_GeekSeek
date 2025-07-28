@@ -61,14 +61,15 @@ def train_epoch(args, epoch, model, data_loader, optimizer, scheduler,
     is_prompt_model = "Prompt" in model.__class__.__name__
 
     for iter_num, data in pbar:
-        # [MERGE] 유연한 데이터 언패킹 (현재 버전 유지)
-        if len(data) == 8:
-            mask, kspace, target, maximum, fnames, _, cats, domain_indices = data
-            if is_prompt_model:
-                domain_indices = domain_indices.cuda(non_blocking=True)
+        # [최종 수정] 9개, 7개 모든 케이스를 유연하게 처리
+        if len(data) == 9:
+            mask, kspace, target, maximum, fnames, _, cats, domain_indices, acc_indices = data
+            domain_indices = domain_indices.cuda(non_blocking=True)
+            acc_indices = acc_indices.cuda(non_blocking=True)
         elif len(data) == 7:
             mask, kspace, target, maximum, fnames, _, cats = data
             domain_indices = None
+            acc_indices = None
         else:
             raise ValueError(f"Unexpected data batch length: {len(data)}")
 
@@ -78,7 +79,10 @@ def train_epoch(args, epoch, model, data_loader, optimizer, scheduler,
         maximum = maximum.cuda(non_blocking=True)
 
         with autocast(enabled=amp_enabled):
-            if is_prompt_model:
+            # [최종 수정] 모델 종류에 따라 필요한 인자를 정확히 전달
+            if "PromptFIVarNet" in model.__class__.__name__:
+                output = model(kspace, mask, domain_indices, acc_indices)
+            elif is_prompt_model:
                 output = model(kspace, mask, domain_indices)
             else:
                 output = model(kspace, mask)
@@ -134,6 +138,7 @@ def train_epoch(args, epoch, model, data_loader, optimizer, scheduler,
 
         del output, current_loss, loss, loss_vals, ssim_loss_vals, ssim_vals, mask, kspace, target, maximum
         if domain_indices is not None: del domain_indices
+        if 'acc_indices' in locals() and acc_indices is not None: del acc_indices
         torch.cuda.empty_cache()
 
     epoch_time = time.perf_counter() - start_iter
@@ -152,14 +157,15 @@ def validate(args, model, data_loader, acc_val, epoch, loss_type, ssim_metric):
 
     with torch.no_grad():
         for idx, data in pbar:
-            # [MERGE] 유연한 데이터 언패킹 (현재 버전 유지)
-            if len(data) == 8:
-                mask, kspace, target, maximum, fnames, slices, cats, domain_indices = data
-                if is_prompt_model:
-                    domain_indices = domain_indices.cuda(non_blocking=True)
+            # [최종 수정] 9개, 7개 모든 케이스를 유연하게 처리
+            if len(data) == 9:
+                mask, kspace, target, maximum, fnames, slices, cats, domain_indices, acc_indices = data
+                domain_indices = domain_indices.cuda(non_blocking=True)
+                acc_indices = acc_indices.cuda(non_blocking=True)
             elif len(data) == 7:
                 mask, kspace, target, maximum, fnames, slices, cats = data
                 domain_indices = None
+                acc_indices = None
             else:
                 raise ValueError(f"Unexpected data batch length: {len(data)}")
 
@@ -168,8 +174,13 @@ def validate(args, model, data_loader, acc_val, epoch, loss_type, ssim_metric):
             target = target.cuda(non_blocking=True)
             maximum = maximum.cuda(non_blocking=True)
             
-            if is_prompt_model: output = model(kspace, mask, domain_indices)
-            else: output = model(kspace, mask)
+            # [최종 수정] 모델 종류에 따라 필요한 인자를 정확히 전달
+            if "PromptFIVarNet" in model.__class__.__name__:
+                output = model(kspace, mask, domain_indices, acc_indices)
+            elif is_prompt_model:
+                output = model(kspace, mask, domain_indices)
+            else:
+                output = model(kspace, mask)
             
             for i in range(output.shape[0]):
                 reconstructions[fnames[i]][int(slices[i])] = output[i].cpu().numpy()
@@ -272,7 +283,6 @@ def train(args, classifier=None):
         cfg_clean = OmegaConf.create({k: v for k, v in mask_aug_cfg.items() if k != "enable"})
         mask_augmenter = instantiate(cfg_clean)
 
-    # [MERGE] GitHub 버전의 완전한 Resume 로직을 적용합니다.
     start_epoch, best_val_loss, best_val_ssim, val_loss_history = 0, float('inf'), 0.0, []
     scaler = GradScaler(enabled=amp_enabled)
 
@@ -309,7 +319,6 @@ def train(args, classifier=None):
         if augmenter: augmenter.update_state(current_epoch=epoch, val_loss=last_val_loss)
         if mask_augmenter: mask_augmenter.update_state(current_epoch=epoch, val_loss=last_val_loss)
 
-        # [MERGE] classifier 전달 로직 (현재 버전 유지)
         train_loader = create_data_loaders(data_path=args.data_path_train, args=args, shuffle=True, augmenter=augmenter, mask_augmenter=mask_augmenter, is_train=True, classifier=classifier if is_prompt_model else None)
 
         accum_steps_epoch = _accum_steps_for_epoch(epoch)
@@ -325,7 +334,6 @@ def train(args, classifier=None):
         best_val_loss = min(best_val_loss, val_loss)
         best_val_ssim = max(best_val_ssim, val_ssim)
         
-        # [MERGE] GitHub 버전의 완전한 Checkpoint 저장 로직을 적용합니다.
         checkpoint = {
             'epoch': epoch + 1, 'args': args, 'model': model.state_dict(),
             'optimizer': optimizer.state_dict(), 'scheduler': scheduler.state_dict() if scheduler is not None else None,
@@ -338,7 +346,7 @@ def train(args, classifier=None):
 
         if scheduler and not use_deepspeed:
             if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau): scheduler.step(val_loss)
-            elif not isinstance(scheduler, (torch.optim.lr_scheduler.OneCycleLR, torch.optim.lr_scheduler.CyclicLR)): pass # Handled in train_epoch
+            elif not isinstance(scheduler, (torch.optim.lr_scheduler.OneCycleLR, torch.optim.lr_scheduler.CyclicLR)): pass
             else: scheduler.step()
 
         if getattr(args, "use_wandb", False) and wandb:

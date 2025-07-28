@@ -1,6 +1,7 @@
 # utils/data/duplicate_dataset.py
 from torch.utils.data import Dataset
 import numpy as np, torch, os, json
+from typing import Dict, Any, Sequence
 
 class DuplicateMaskDataset(Dataset):
     def __init__(self,
@@ -30,12 +31,12 @@ class DuplicateMaskDataset(Dataset):
         cfg_idx   = idx %  self.dup
         accel     = self.cfgs[cfg_idx]["accel"]
 
-        # [FIX] 8개 항목을 받도록 언패킹 수정
-        mask, kspace, target, attrs, fname, slice_idx, cat, domain_idx = (
+        # [최종 수정] SliceData가 9개 항목을 반환하므로, 9개 변수로 받습니다.
+        mask, kspace, target, attrs, fname, slice_idx, cat, domain_idx, acc_idx = (
             self.base_ds[base_idx])
         
         organ, _ = cat.split("_")
-        N = mask.shape[-1] # 원본 readout 폭
+        N = mask.shape[-1]
         key = f"{organ}_x{accel}_{N}"
 
         if key not in self.bundle:
@@ -44,5 +45,5 @@ class DuplicateMaskDataset(Dataset):
         new_mask = self.bundle[key].astype(np.uint8)
         new_cat = f"{organ}_x{accel}"
 
-        # [FIX] 8개 항목을 다시 반환 (domain_idx는 그대로 전달)
-        return new_mask, kspace, target, attrs, fname, slice_idx, new_cat, domain_idx
+        # [최종 수정] 9개 항목을 다시 반환합니다.
+        return new_mask, kspace, target, attrs, fname, slice_idx, new_cat, domain_idx, acc_idx

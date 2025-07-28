@@ -1,0 +1,16 @@
+# configs/model/prompt_fivarnet.yaml
+
+_target_: utils.model.feature_varnet.prompt_fivarnet.PromptFIVarNet
+
+num_cascades: 1
+chans: 1
+pools: 1
+sens_chans: 1
+sens_pools: 1
+mask_center: true
+
+# --- Prompt-FIVarNet 전용 파라미터 ---
+num_domains: 2          # knee, brain
+domain_embed_dim: 64    # [FIX] 도메인 프롬프트 벡터 차원
+num_acc: 2              # [FIX] 가속도 종류 (x4, x8)
+acc_embed_dim: 64       # [FIX] 가속도 프롬프트 벡터 차원

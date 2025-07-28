@@ -1,7 +1,7 @@
 # configs/train_promptmr.yaml
 defaults:
   - _self_
-  - model: prompt_varnet        # 프롬프트 모델 기본 설정
+  - model: prompt_fivarnet       # 프롬프트 모델 기본 설정
   - data: local_gpu  # 데이터 경로 설정
   - classifier: cnn             # 분류기 모델 설정
   - LRscheduler: ExponentialLR
@@ -28,11 +28,11 @@ corner_size : 16
 classifier_training:
   epochs: 1
   lr: 1e-4
-  batch_size: 16
+  batch_size: 1
 
 # === 공통 학습 하이퍼파라미터 ===
 GPU_NUM: 0
-batch_size: 4
+batch_size: 1
 val_batch_size: 3
 num_epochs: 30
 max_epochs: 30

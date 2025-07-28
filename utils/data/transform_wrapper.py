@@ -13,23 +13,30 @@ class TransformWrapper(Dataset):
     def __getitem__(self, idx):
         sample = self.base_ds[idx]
         
-        # [FIX] promptmr 모드(8-tuple)와 일반 모드(7-tuple)를 모두 처리
-        if len(sample) == 8: # (mask, kspace, target, attrs, fname, sidx, cat, domain_idx)
-            mask, kspace, target, attrs, fname, sidx, cat, domain_idx = sample
-            # transform은 앞 6개 항목만 처리
+        # [최종 수정] 9, 8, 7, 6개 모든 케이스를 처리하여 완벽한 호환성을 보장합니다.
+        if len(sample) == 9: # promptmr + acc_idx 모드
+            mask, kspace, target, attrs, fname, sidx, cat, domain_idx, acc_idx = sample
             t_mask, t_kspace, t_target, t_maximum, t_fname, t_sidx = \
                 self.transform(mask, kspace, target, attrs, fname, sidx)
-            # transform 결과와 cat, domain_idx를 합쳐 반환
+            return t_mask, t_kspace, t_target, t_maximum, t_fname, t_sidx, cat, domain_idx, acc_idx
+        
+        elif len(sample) == 8: # acc_idx가 없는 이전 promptmr 모드
+            mask, kspace, target, attrs, fname, sidx, cat, domain_idx = sample
+            t_mask, t_kspace, t_target, t_maximum, t_fname, t_sidx = \
+                self.transform(mask, kspace, target, attrs, fname, sidx)
             return t_mask, t_kspace, t_target, t_maximum, t_fname, t_sidx, cat, domain_idx
         
-        elif len(sample) == 7: # (mask, kspace, target, attrs, fname, sidx, cat)
+        elif len(sample) == 7: # 일반 main.py 모드
             mask, kspace, target, attrs, fname, sidx, cat = sample
             t_mask, t_kspace, t_target, t_maximum, t_fname, t_sidx = \
                 self.transform(mask, kspace, target, attrs, fname, sidx)
             return t_mask, t_kspace, t_target, t_maximum, t_fname, t_sidx, cat
             
-        else: # isforward=True인 경우 등
+        elif len(sample) == 6: # isforward=True 모드
             mask, kspace, target, attrs, fname, sidx = sample
             t_mask, t_kspace, t_target, t_maximum, t_fname, t_sidx = \
                 self.transform(mask, kspace, target, attrs, fname, sidx)
             return t_mask, t_kspace, t_target, t_maximum, t_fname, t_sidx
+        
+        else:
+            raise ValueError(f"Unexpected sample length from base_ds: {len(sample)}")
