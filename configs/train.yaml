@@ -31,11 +31,11 @@ num_epochs: ${max_epochs} # 실제 돌아가는 epoch
 max_epochs : 30   # aug용 max epoch (domain train의 block training 때문에 넣음)
 warmup_epochs : 3
 lr: 1e-3
-report_interval: 5000
+report_interval: 7000
 seed: 430
 num_workers: 0
 
-exp_name : fivarnet_test
+exp_name : varnet_finalMainTest_fm1
 
 # these three are *required* by utils/data/load_data.py → create_data_loaders
 input_key:  kspace

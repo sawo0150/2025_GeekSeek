@@ -54,7 +54,15 @@ def forward(args):
     model.to(device=device)
     
     checkpoint = torch.load(args.exp_dir / 'best_model.pt', map_location='cpu', weights_only=False)
-    print("checkpoint_epoch : ", checkpoint['epoch'], "best_val_loss : ", checkpoint['best_val_loss'].item())
+    # print("checkpoint_epoch : ", checkpoint['epoch'], "best_val_loss : ", checkpoint['best_val_loss'].item())
+    best_loss = checkpoint.get('best_val_loss',
+                               checkpoint.get('best_train_loss', None))
+    if best_loss is not None:
+        best_loss_val = best_loss.item() if torch.is_tensor(best_loss) else best_loss
+        print(f"checkpoint_epoch : {checkpoint['epoch']}   best_loss : {best_loss_val:.4g}")
+    else:
+        print(f"checkpoint_epoch : {checkpoint['epoch']}   (best-loss key 없음)")
+
     model.load_state_dict(checkpoint['model'])
     
     # print(args.batch_size)
