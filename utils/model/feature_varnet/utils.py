@@ -1,3 +1,4 @@
+# utils/model/feature_varnet/utils.py
 import math
 import torch
 from torch import Tensor
@@ -71,13 +72,13 @@ def unnorm_fn(image: Tensor, means: Tensor, variances: Tensor) -> Tensor:
 def complex_to_chan_dim(x: Tensor) -> Tensor:
     b, c, h, w, two = x.shape
     assert two == 2
-    assert c == 1
+    assert c == 1 # <--- 이 부분!
     return x.permute(0, 4, 1, 2, 3).reshape(b, 2 * c, h, w)
 
 
 def chan_complex_to_last_dim(x: Tensor) -> Tensor:
     b, c2, h, w = x.shape
-    assert c2 == 2
+    assert c2 == 2 # <--- 이 부분!
     c = c2 // 2
     return x.view(b, 2, c, h, w).permute(0, 2, 3, 4, 1).contiguous()
 
