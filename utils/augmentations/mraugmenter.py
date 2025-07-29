@@ -63,7 +63,7 @@ class MRAugmenter:
         self.shift_extent = shift_extent
         self.max_shear_angle = max_shear_angle
 
-        self.rng = np.random.RandomState()
+        self.rng = np.random.RandomState(430)
         print("[MRAug] max_epochs : ",max_epochs)
         
         # ✨ 상태 저장을 위한 변수 초기화

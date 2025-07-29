@@ -44,7 +44,7 @@ class MaskAugmenter:
         self.type_probs = [p/s for p in probs]
         self.types = list(mask_specs.keys())
         # 상태
-        self.rng = np.random.RandomState()
+        self.rng = np.random.RandomState(430)
         self.current_epoch = 0
         self.val_hist = []
 
