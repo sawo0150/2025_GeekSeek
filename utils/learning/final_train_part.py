@@ -24,7 +24,7 @@ os.environ.setdefault(
     "max_split_size_mb:64,garbage_collection_threshold:0.6"
 )
 
-import shutil
+import shutil, random
 
 from tqdm import tqdm
 from hydra.utils import instantiate          # ★ NEW
@@ -268,6 +268,10 @@ def train_epoch(args, epoch, model, data_loader, optimizer, scheduler,
 def train(args):
     device = torch.device(f'cuda:{args.GPU_NUM}' if torch.cuda.is_available() else 'cpu')
     torch.cuda.set_device(device)
+
+    # ② DataLoader용 torch.Generator
+    g = torch.Generator()
+    g.manual_seed(args.seed)
     
     print('Current cuda device: ', torch.cuda.current_device())
 
@@ -562,6 +566,17 @@ def train(args):
     else:
         train_loss_log = np.empty((0, 2))
 
+    # ③ worker마다 NumPy/Python RNG, 그리고 MaskAugmenter RNG 재시딩
+    def seed_worker(worker_id):
+        worker_seed = args.seed  # 필요에 따라 + worker_id 혹은 + epoch
+        random.seed(worker_seed)
+        np.random.seed(worker_seed)
+        # augmenters가 있다면 각 worker의 복사본 RNG도 초기화
+        if 'augmenter' in globals() and augmenter is not None:
+            augmenter.rng.seed(worker_seed)
+        if 'mask_augmenter' in globals() and mask_augmenter is not None:
+            mask_augmenter.rng.seed(worker_seed)
+
     for epoch in range(start_epoch, args.num_epochs):
         MetricLog_train = MetricAccumulator("train")
         # MetricLog_val   = MetricAccumulator("val")
@@ -614,6 +629,8 @@ def train(args):
             shuffle      = True,
             num_workers  = args.num_workers,
             collate_fn   = collate_fn,   # 기존 collate 재사용
+            worker_init_fn  = seed_worker,   # ← 추가
+            generator       = g,             # ← 추가: 동일한 shuffle 보장
         )
 
         # ── epoch별 accum_steps 갱신 ──

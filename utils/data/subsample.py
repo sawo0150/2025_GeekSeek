@@ -479,6 +479,7 @@ def create_mask_for_mask_type(
     mask_type_str: str,
     center_fractions: Sequence[float],
     accelerations: Sequence[int],
+    seed=None,
 ) -> MaskFunc:
     """
     Creates a mask of the specified type.
@@ -491,14 +492,14 @@ def create_mask_for_mask_type(
         A mask func for the target mask type.
     """
     if mask_type_str == "random":
-        return RandomMaskFunc(center_fractions, accelerations)
+        return RandomMaskFunc(center_fractions, accelerations, seed=seed)
     elif mask_type_str == "equispaced":
-        return EquiSpacedMaskFunc(center_fractions, accelerations)
+        return EquiSpacedMaskFunc(center_fractions, accelerations, seed=seed)
     elif mask_type_str == "equispaced_fraction":
-        return EquispacedMaskFractionFunc(center_fractions, accelerations)
+        return EquispacedMaskFractionFunc(center_fractions, accelerations, seed=seed)
     elif mask_type_str == "magic":
-        return MagicMaskFunc(center_fractions, accelerations)
+        return MagicMaskFunc(center_fractions, accelerations, seed=seed)
     elif mask_type_str == "magic_fraction":
-        return MagicMaskFractionFunc(center_fractions, accelerations)
+        return MagicMaskFractionFunc(center_fractions, accelerations, seed=seed)
     else:
         raise ValueError(f"{mask_type_str} not supported")

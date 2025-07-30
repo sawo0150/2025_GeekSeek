@@ -6,7 +6,7 @@ set -o pipefail # 파이프라인에서도 오류 전파
 # ★ 필요하면 프로젝트 루트로 이동
 # cd /path/to/FastMRI_challenge
 
-BASE_EXP="ampXSeedFix_fm"      # train.yaml의 기본 exp_name
+BASE_EXP="ampXSeedFix_fm2"      # train.yaml의 기본 exp_name
 PYTHON_ENTRY="final_main.py"  # Hydra 진입 스크립트
 
 for run in 1 2; do

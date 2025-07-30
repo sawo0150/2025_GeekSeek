@@ -176,6 +176,7 @@ class MaskAugmenter:
             mtype,
             center_fractions=[cf],
             accelerations=[curr_acc],
+            seed=self.rng.randint(0, 1023),
         )
         if hasattr(mf, "allow_any_combination"):
             mf.allow_any_combination = self.allow_any

@@ -33,8 +33,12 @@ mask_specs:
     prob: 0.25   #   이 타입이 뽑힐 가중치 (전체 합으로 정규화)
     accel: [4, 8]          # #   undersampling 배수 중 랜덤 선택
     cf:    [0.07, 0.10]    # #   center-fraction 실수 균등 샘플
+  magic:   # ▸ MagicMaskFunc
+    prob: 0.125
+    accel: [4, 8]               # 단일 값
+    cf:    [0.07, 0.10]            # 단일 값
   magic_fraction:   # ▸ MagicMaskFractionFunc
-    prob: 0.25
+    prob: 0.125
     accel: [4, 8]               # 단일 값
     cf:    [0.07, 0.10]            # 단일 값
 allow_any_combination: true   # accel 과 cf 를 교차 짝짓기 허용 여부
