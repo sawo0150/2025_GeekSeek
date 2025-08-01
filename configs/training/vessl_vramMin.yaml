@@ -13,7 +13,7 @@ grad_clip:           # ⬅︎ 새 섹션
 #                - steps: 10  # 사용할 accum_steps
 #   ※ 필요에 맞게 구간을 추가/수정하세요.
 grad_accum_scheduler:
-  enable: true
+  enable: false
   milestones:
     # 초기 탐색
     - epoch: 0
