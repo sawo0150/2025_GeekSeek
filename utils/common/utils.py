@@ -73,10 +73,6 @@ def seed_fix(n):
     torch.cuda.manual_seed_all(n)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-    os.environ["PYTHONHASHSEED"] = str(n)   # 파이썬 객체 해시 순서를 고정
-    torch.use_deterministic_algorithms(True)
-    torch.backends.cuda.matmul.allow_tf32 = False  # TF32 (가변 정밀) 끄기
-    torch.backends.cudnn.allow_tf32      = False
     np.random.seed(n)
     random.seed(n)
 

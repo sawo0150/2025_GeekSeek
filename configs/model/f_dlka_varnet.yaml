@@ -9,7 +9,7 @@ variant: "dlka"
 
 # 각 cascade 단계별 블록 수
 #   [ DLKA-UNet 블록, 일반 Feature 블록, 이미지-공간 VarNet 블록 ]
-cascade_counts: [5, 9, 3]        # default
+cascade_counts: [5, 10, 3]        # default
 
 # ───────── Feature encoder/decoder & U-Net 설정 ─────────
 feature_chans: 12                 # encoder/decoder 내부 채널 수
