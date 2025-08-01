@@ -127,7 +127,7 @@ class SliceData(Dataset):
                 target, attrs = hf[self.target_key][dataslice], dict(hf.attrs)
         return (mask, input_data, target, attrs, kspace_fname.name, dataslice, cat, domain_idx, acc_idx)
 
-def create_data_loaders(data_path, args, shuffle=False, isforward=False, augmenter=None, mask_augmenter=None, is_train=False,
+def create_data_loaders(data_path, args, shuffle=True, isforward=False, augmenter=None, mask_augmenter=None, is_train=False,
                         domain_filter=None, classifier=None, batch_size_override=None, for_classifier=False):
     max_key_ = args.max_key if not isforward else -1
     target_key_ = args.target_key if not isforward else None
