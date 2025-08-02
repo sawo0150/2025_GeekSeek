@@ -1,9 +1,11 @@
+# /*configs.model.varnet_sweep2.yaml*/
 # VarNet 확장 버전
 _target_: utils.model.varnet.VarNet
 
-num_cascades: 18
-chans: 16
+num_cascades: 20
+chans: 18
 sens_chans: 8
+kernel_size: 7 # ★ NEW: U-Net의 컨볼루션 커널 크기. 3, 5, 7 등 홀수로 설정 가능합니다.
 
 # (20,18,8)
 # checkpointing 켰다고 가정 : 7170 -> 학습 불가

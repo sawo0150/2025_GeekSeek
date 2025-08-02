@@ -1,6 +1,7 @@
 # VarNet 경량 버전
 _target_: utils.model.varnet.VarNet
 
-num_cascades: 1
+num_cascades: 10
 chans: 9
 sens_chans: 4
+kernel_size: 3 # ★ NEW: U-Net의 컨볼루션 커널 크기. 3, 5, 7 등 홀수로 설정 가능합니다.

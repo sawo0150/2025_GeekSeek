@@ -1,3 +1,4 @@
+# /*utils.model.varnet.py*/
 """
 Copyright (c) Facebook, Inc. and its affiliates.
 
@@ -15,7 +16,7 @@ import torch.nn.functional as F
 from torch.utils.checkpoint import checkpoint  
 from fastmri.data import transforms
 
-from unet import Unet
+from .unet import Unet
 from utils.common.utils import center_crop
 
 
@@ -35,6 +36,7 @@ class NormUnet(nn.Module):
         in_chans: int = 2,
         out_chans: int = 2,
         drop_prob: float = 0.0,
+        kernel_size: int = 3,
     ):
         """
         Args:
@@ -43,6 +45,7 @@ class NormUnet(nn.Module):
             in_chans: Number of channels in the input to the U-Net model.
             out_chans: Number of channels in the output to the U-Net model.
             drop_prob: Dropout probability.
+            kernel_size: Kernel size for the convolutional layers.
         """
         super().__init__()
 
@@ -52,6 +55,7 @@ class NormUnet(nn.Module):
             chans=chans,
             num_pool_layers=num_pools,
             drop_prob=drop_prob,
+            kernel_size=kernel_size,
         )
 
     def complex_to_chan_dim(self, x: torch.Tensor) -> torch.Tensor:
@@ -90,10 +94,6 @@ class NormUnet(nn.Module):
         h_mult = ((h - 1) | 15) + 1
         w_pad = [math.floor((w_mult - w) / 2), math.ceil((w_mult - w) / 2)]
         h_pad = [math.floor((h_mult - h) / 2), math.ceil((h_mult - h) / 2)]
-        # TODO: fix this type when PyTorch fixes theirs
-        # the documentation lies - this actually takes a list
-        # https://github.com/pytorch/pytorch/blob/master/torch/nn/functional.py#L3457
-        # https://github.com/pytorch/pytorch/pull/16949
         x = F.pad(x, w_pad + h_pad)
 
         return x, (h_pad, w_pad, h_mult, w_mult)
@@ -112,14 +112,12 @@ class NormUnet(nn.Module):
         if not x.shape[-1] == 2:
             raise ValueError("Last dimension must be 2 for complex.")
 
-        # get shapes for unet and normalize
         x = self.complex_to_chan_dim(x)
         x, mean, std = self.norm(x)
         x, pad_sizes = self.pad(x)
 
         x = self.unet(x)
 
-        # get shapes back and unnormalize
         x = self.unpad(x, *pad_sizes)
         x = self.unnorm(x, mean, std)
         x = self.chan_complex_to_last_dim(x)
@@ -130,10 +128,6 @@ class NormUnet(nn.Module):
 class SensitivityModel(nn.Module):
     """
     Model for learning sensitivity estimation from k-space data.
-
-    This model applies an IFFT to multichannel k-space data and then a U-Net
-    to the coil images to estimate coil sensitivities. It can be used with the
-    end-to-end variational network.
     """
 
     def __init__(
@@ -143,6 +137,7 @@ class SensitivityModel(nn.Module):
         in_chans: int = 2,
         out_chans: int = 2,
         drop_prob: float = 0.0,
+        kernel_size: int = 3,
     ):
         """
         Args:
@@ -151,6 +146,7 @@ class SensitivityModel(nn.Module):
             in_chans: Number of channels in the input to the U-Net model.
             out_chans: Number of channels in the output to the U-Net model.
             drop_prob: Dropout probability.
+            kernel_size: Kernel size for the convolutional layers.
         """
         super().__init__()
 
@@ -160,54 +156,42 @@ class SensitivityModel(nn.Module):
             in_chans=in_chans,
             out_chans=out_chans,
             drop_prob=drop_prob,
+            kernel_size=kernel_size,
         )
 
     def chans_to_batch_dim(self, x: torch.Tensor) -> Tuple[torch.Tensor, int]:
         b, c, h, w, comp = x.shape
-
         return x.view(b * c, 1, h, w, comp), b
 
     def batch_chans_to_chan_dim(self, x: torch.Tensor, batch_size: int) -> torch.Tensor:
         bc, _, h, w, comp = x.shape
         c = bc // batch_size
-
         return x.view(batch_size, c, h, w, comp)
 
     def divide_root_sum_of_squares(self, x: torch.Tensor) -> torch.Tensor:
         return x / fastmri.rss_complex(x, dim=1).unsqueeze(-1).unsqueeze(1)
 
     def forward(self, masked_kspace: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
-        # get low frequency line locations and mask them out
         squeezed_mask = mask[:, 0, 0, :, 0]
         cent = squeezed_mask.shape[1] // 2
-        # running argmin returns the first non-zero
         left = torch.argmin(squeezed_mask[:, :cent].flip(1), dim=1)
         right = torch.argmin(squeezed_mask[:, cent:], dim=1)
         num_low_freqs = torch.max(
             2 * torch.min(left, right), torch.ones_like(left)
-        )  # force a symmetric center unless 1
+        )
         pad = (mask.shape[-2] - num_low_freqs + 1) // 2
-
         x = transforms.batched_mask_center(masked_kspace, pad, pad + num_low_freqs)
-
-        # convert to image space
         x = fastmri.ifft2c(x)
         x, b = self.chans_to_batch_dim(x)
-
-        # estimate sensitivities
         x = self.norm_unet(x)
         x = self.batch_chans_to_chan_dim(x, b)
         x = self.divide_root_sum_of_squares(x)
-
         return x
 
 
 class VarNet(nn.Module):
     """
     A full variational network model.
-
-    This model applies a combination of soft data consistency with a U-Net
-    regularizer. To use non-U-Net regularizers, use VarNetBlock.
     """
 
     def __init__(
@@ -217,39 +201,36 @@ class VarNet(nn.Module):
         sens_pools: int = 4,
         chans: int = 18,
         pools: int = 4,
-        use_checkpoint: bool = False,                  # ★ NEW 토글 파라미터
+        use_checkpoint: bool = False,
+        kernel_size: int = 3,
     ):
         """
         Args:
-            num_cascades: Number of cascades (i.e., layers) for variational
-                network.
+            num_cascades: Number of cascades (i.e., layers) for variational network.
             sens_chans: Number of channels for sensitivity map U-Net.
-            sens_pools Number of downsampling and upsampling layers for
-                sensitivity map U-Net.
+            sens_pools: Number of downsampling layers for sensitivity map U-Net.
             chans: Number of channels for cascade U-Net.
-            pools: Number of downsampling and upsampling layers for cascade
-                U-Net.
+            pools: Number of downsampling layers for cascade U-Net.
+            use_checkpoint: Whether to use activation checkpointing.
+            kernel_size: Kernel size for the convolutional layers.
         """
         super().__init__()
 
-        self.sens_net = SensitivityModel(sens_chans, sens_pools)
+        self.sens_net = SensitivityModel(sens_chans, sens_pools, kernel_size=kernel_size)
         self.cascades = nn.ModuleList(
-            [VarNetBlock(NormUnet(chans, pools)) for _ in range(num_cascades)]
+            [VarNetBlock(NormUnet(chans, pools, kernel_size=kernel_size)) for _ in range(num_cascades)]
         )
-        self.use_checkpoint = use_checkpoint           # ★ NEW 저장
+        self.use_checkpoint = use_checkpoint
 
     def forward(self, masked_kspace: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
         sens_maps = self.sens_net(masked_kspace, mask)
         kspace_pred = masked_kspace.clone()
 
-        # for cascade in self.cascades:
-        #     kspace_pred = cascade(kspace_pred, masked_kspace, mask, sens_maps)
         for cascade in self.cascades:
             if self.use_checkpoint:
-                # activation-checkpointing ↘ 메모리↓, 계산 1회↑
                 kspace_pred = checkpoint(
                     cascade,
-                    kspace_pred,        # 반드시 Tensor
+                    kspace_pred,
                     masked_kspace,
                     mask,
                     sens_maps,
@@ -257,25 +238,22 @@ class VarNet(nn.Module):
                 )
             else:
                 kspace_pred = cascade(kspace_pred, masked_kspace, mask, sens_maps)
+        
         result = fastmri.rss(fastmri.complex_abs(fastmri.ifft2c(kspace_pred)), dim=1)
-        result = center_crop(result, 384, 384)
+        # ★ MODIFIED: center_crop 호출 시 인자를 2개로 나누어 전달합니다.
+        result = center_crop(result, 384, 384) 
         return result
 
 
 class VarNetBlock(nn.Module):
     """
     Model block for end-to-end variational network.
-
-    This model applies a combination of soft data consistency with the input
-    model as a regularizer. A series of these blocks can be stacked to form
-    the full variational network.
     """
 
     def __init__(self, model: nn.Module):
         """
         Args:
-            model: Module for "regularization" component of variational
-                network.
+            model: Module for "regularization" component of variational network.
         """
         super().__init__()
 

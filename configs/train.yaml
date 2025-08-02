@@ -31,7 +31,7 @@ num_epochs: ${max_epochs} # 실제 돌아가는 epoch
 max_epochs : 30   # aug용 max epoch (domain train의 block training 때문에 넣음)
 warmup_epochs : 3
 lr: 1e-3
-report_interval: 5000
+report_interval: 50
 seed: 430
 num_workers: 6
 

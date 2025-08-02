@@ -1,3 +1,4 @@
+# /*utils.model.unet.py*/
 """
 Copyright (c) Facebook, Inc. and its affiliates.
 This source code is licensed under the MIT license found in the
@@ -25,6 +26,7 @@ class Unet(nn.Module):
         chans: int = 32,
         num_pool_layers: int = 4,
         drop_prob: float = 0.0,
+        kernel_size: int = 3, # ★ NEW: 커널 크기 파라미터 추가
     ):
         """
         Args:
@@ -33,6 +35,7 @@ class Unet(nn.Module):
             chans: Number of output channels of the first convolution layer.
             num_pool_layers: Number of down-sampling and up-sampling layers.
             drop_prob: Dropout probability.
+            kernel_size: Kernel size for the convolutional layers. # ★ NEW: docstring 추가
         """
         super().__init__()
 
@@ -41,25 +44,26 @@ class Unet(nn.Module):
         self.chans = chans
         self.num_pool_layers = num_pool_layers
         self.drop_prob = drop_prob
+        self.kernel_size = kernel_size # ★ NEW: 커널 크기 저장
 
-        self.down_sample_layers = nn.ModuleList([ConvBlock(in_chans, chans, drop_prob)])
+        self.down_sample_layers = nn.ModuleList([ConvBlock(in_chans, chans, drop_prob, kernel_size)]) # ★ MODIFIED: kernel_size 전달
         ch = chans
         for _ in range(num_pool_layers - 1):
-            self.down_sample_layers.append(ConvBlock(ch, ch * 2, drop_prob))
+            self.down_sample_layers.append(ConvBlock(ch, ch * 2, drop_prob, kernel_size)) # ★ MODIFIED: kernel_size 전달
             ch *= 2
-        self.conv = ConvBlock(ch, ch * 2, drop_prob)
+        self.conv = ConvBlock(ch, ch * 2, drop_prob, kernel_size) # ★ MODIFIED: kernel_size 전달
 
         self.up_conv = nn.ModuleList()
         self.up_transpose_conv = nn.ModuleList()
         for _ in range(num_pool_layers - 1):
             self.up_transpose_conv.append(TransposeConvBlock(ch * 2, ch))
-            self.up_conv.append(ConvBlock(ch * 2, ch, drop_prob))
+            self.up_conv.append(ConvBlock(ch * 2, ch, drop_prob, kernel_size)) # ★ MODIFIED: kernel_size 전달
             ch //= 2
 
         self.up_transpose_conv.append(TransposeConvBlock(ch * 2, ch))
         self.up_conv.append(
             nn.Sequential(
-                ConvBlock(ch * 2, ch, drop_prob),
+                ConvBlock(ch * 2, ch, drop_prob, kernel_size), # ★ MODIFIED: kernel_size 전달
                 nn.Conv2d(ch, self.out_chans, kernel_size=1, stride=1),
             )
         )
@@ -116,25 +120,29 @@ class ConvBlock(nn.Module):
     instance normalization, LeakyReLU activation and dropout.
     """
 
-    def __init__(self, in_chans: int, out_chans: int, drop_prob: float):
+    def __init__(self, in_chans: int, out_chans: int, drop_prob: float, kernel_size: int = 3): # ★ MODIFIED: kernel_size 인자 추가
         """
         Args:
             in_chans: Number of channels in the input.
             out_chans: Number of channels in the output.
             drop_prob: Dropout probability.
+            kernel_size: Kernel size for the convolutional layers. # ★ NEW: docstring 추가
         """
         super().__init__()
 
         self.in_chans = in_chans
         self.out_chans = out_chans
         self.drop_prob = drop_prob
+        self.kernel_size = kernel_size # ★ NEW: 커널 크기 저장
+
+        padding = kernel_size // 2 # ★ NEW: 커널 크기에 따른 동적 패딩 계산
 
         self.layers = nn.Sequential(
-            nn.Conv2d(in_chans, out_chans, kernel_size=3, padding=1, bias=False),
+            nn.Conv2d(in_chans, out_chans, kernel_size=kernel_size, padding=padding, bias=False), # ★ MODIFIED
             nn.InstanceNorm2d(out_chans),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
             nn.Dropout2d(drop_prob),
-            nn.Conv2d(out_chans, out_chans, kernel_size=3, padding=1, bias=False),
+            nn.Conv2d(out_chans, out_chans, kernel_size=kernel_size, padding=padding, bias=False), # ★ MODIFIED
             nn.InstanceNorm2d(out_chans),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
             nn.Dropout2d(drop_prob),
