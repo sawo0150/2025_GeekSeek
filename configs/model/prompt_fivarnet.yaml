@@ -3,7 +3,7 @@ _target_: utils.model.feature_varnet.prompt_fivarnet.PromptFIVarNet
 
 num_cascades: 10
 num_image_cascades: 8
-chans: 9
+chans: 36
 pools: 4
 sens_chans: 8
 sens_pools: 4
@@ -13,10 +13,12 @@ use_checkpoint: true
 
 # --- Prompt-FIVarNet 전용 파라미터 ---
 num_domains: 2
-domain_embed_dim: 32
+domain_embed_dim: 64
 num_acc: 2
-acc_embed_dim: 32
+acc_embed_dim: 64
 
 # [MODIFIED] 동적/다중스케일 프롬프트를 위한 하이퍼파라미터 추가
 prompt_bank_size: 8       # 프롬프트 뱅크(템플릿)의 개수
-prompt_dim_multiscale: 16 # U-Net 내부에서 생성/주입될 동적 프롬프트의 채널 차원
+prompt_dim_multiscale: 64 # U-Net 내부에서 생성/주입될 동적 프롬프트의 채널 차원
+
+# 7218.32

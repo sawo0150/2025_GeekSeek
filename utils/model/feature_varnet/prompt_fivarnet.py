@@ -18,7 +18,7 @@ from .blocks import VarNetBlock
 
 
 # ----------------------------------------------------------------------
-# [NEW CLASS] 1. 동적 프롬프트 생성 블록 (수정 없음)
+# [NEW CLASS] 1. 동적 프롬프트 생성 블록
 # ----------------------------------------------------------------------
 class DynamicPromptBlock(nn.Module):
     """
@@ -82,45 +82,31 @@ class PromptUnet(nn.Module):
         self.num_pool_layers = num_pool_layers
         self.drop_prob = drop_prob
 
-        # --- 인코더 (기존 Unet과 동일) ---
         self.down_sample_layers = nn.ModuleList([ConvBlock(in_chans, chans, drop_prob)])
         ch = chans
         for _ in range(num_pool_layers - 1):
             self.down_sample_layers.append(ConvBlock(ch, ch * 2, drop_prob))
             ch *= 2
         self.conv = ConvBlock(ch, ch * 2, drop_prob)
-        
-        ch = ch * 2 # bottleneck 후 채널 수
+        ch = ch * 2
 
-        # --- [MODIFIED] 디코더 (프롬프트 주입 로직 수정) ---
         self.up_conv = nn.ModuleList()
         self.up_transpose_conv = nn.ModuleList()
         self.prompt_blocks = nn.ModuleList()
 
-        # 가장 깊은 디코더 층부터 얕은 층 순서로 모듈 생성
         for _ in range(num_pool_layers):
             transpose_in_ch = ch
             transpose_out_ch = ch // 2
-            
-            # 1. 업샘플링 모듈 생성
             self.up_transpose_conv.append(TransposeConvBlock(transpose_in_ch, transpose_out_ch))
-
-            # 2. 동적 프롬프트 블록 생성
-            #    입력 피처는 transpose_conv의 출력이므로 채널 수는 transpose_out_ch
             self.prompt_blocks.append(
                 DynamicPromptBlock(
-                    feature_chans=transpose_out_ch, # [FIXED] 실제 입력될 채널 수로 수정
+                    feature_chans=transpose_out_ch,
                     global_prompt_dim=global_prompt_dim,
                     prompt_bank_size=prompt_bank_size,
                     prompt_dim_multiscale=prompt_dim_multiscale
                 )
             )
-
-            # 3. 컨볼루션 블록 생성
-            #    입력 채널 = (업샘플링 피처 + skip-connection 피처 + 동적 프롬프트)
             conv_in_chans = transpose_out_ch + transpose_out_ch + prompt_dim_multiscale
-            
-            # 마지막 디코더 층은 최종 출력 채널(out_chans)로 맞춰줌
             if _ == num_pool_layers - 1:
                 self.up_conv.append(
                     nn.Sequential(
@@ -130,51 +116,37 @@ class PromptUnet(nn.Module):
                 )
             else:
                 self.up_conv.append(ConvBlock(conv_in_chans, transpose_out_ch, drop_prob))
-
-            # 다음 층(더 얕은 층)을 위해 채널 수 업데이트
             ch //= 2
 
     def forward(self, image: torch.Tensor, global_prompt: Optional[Tensor] = None) -> torch.Tensor:
         stack = []
         output = image
-
-        # --- 인코더 ---
         for layer in self.down_sample_layers:
             output = layer(output)
             stack.append(output)
             output = F.avg_pool2d(output, kernel_size=2, stride=2, padding=0)
         output = self.conv(output)
-
-        # --- 디코더 ---
-        # __init__에서 이미 올바른 순서로 생성했으므로, 리스트를 뒤집을 필요 없음
         for i, (transpose_conv, conv) in enumerate(zip(self.up_transpose_conv, self.up_conv)):
             skip_connection = stack.pop()
             output = transpose_conv(output)
-
-            # Padding to handle odd input dimensions
             padding = [0, 0, 0, 0]
             if output.shape[-1] != skip_connection.shape[-1]:
-                padding[1] = 1  # padding right
+                padding[1] = 1
             if output.shape[-2] != skip_connection.shape[-2]:
-                padding[3] = 1  # padding bottom
+                padding[3] = 1
             if torch.sum(torch.tensor(padding)) != 0:
                 output = F.pad(output, padding, "reflect")
-
-            # 다중 스케일 동적 프롬프트 생성 및 주입
             if global_prompt is not None:
-                # i번째 prompt_block은 i번째 디코더 층을 담당
                 dynamic_prompt = self.prompt_blocks[i](output, global_prompt)
                 output = torch.cat([output, skip_connection, dynamic_prompt], dim=1)
             else:
                 output = torch.cat([output, skip_connection], dim=1)
-
             output = conv(output)
-
         return output
 
 
 # ----------------------------------------------------------------------
-# 3. 새로운 모듈을 사용하도록 기존 블록 및 메인 모델 수정 (수정 없음)
+# 3. 새로운 모듈을 사용하도록 기존 블록 및 메인 모델 수정
 # ----------------------------------------------------------------------
 class PromptAttentionFeatureVarNetBlock(nn.Module):
     def __init__(
@@ -196,7 +168,6 @@ class PromptAttentionFeatureVarNetBlock(nn.Module):
         feature_chans = self.encoder.feature_chans
         self.input_norm = nn.InstanceNorm2d(feature_chans)
         self.kspace_mult_factor = kspace_mult_factor
-
         if use_extra_feature_conv:
             self.output_norm = nn.InstanceNorm2d(feature_chans)
             self.output_conv = nn.Sequential(
@@ -302,7 +273,7 @@ class NormWrapper(nn.Module):
 
 
 # ----------------------------------------------------------------------
-# 4. 메인 PromptFIVarNet 클래스 수정 (수정 없음)
+# 4. 메인 PromptFIVarNet 클래스 수정
 # ----------------------------------------------------------------------
 class PromptFIVarNet(nn.Module):
     def __init__(
@@ -381,26 +352,41 @@ class PromptFIVarNet(nn.Module):
         acc_prompt = self.acc_embedding(acc_indices)
         combined_prompt = torch.cat([domain_prompt, acc_prompt], dim=1)
 
+        # [MODIFIED] 체크포인팅 로직 수정
         for cascade_block in self.feat_cascades:
             if self.use_checkpoint and self.training:
-                def run_block(fi, prompt): return cascade_block(fi, prompt)
-                feature_image = checkpoint(run_block, feature_image, combined_prompt, use_reentrant=False)
+                # `block=cascade_block`으로 현재 루프의 블록을 캡처
+                def run_feat_block(fi, prompt, block=cascade_block):
+                    return block(fi, prompt)
+                feature_image = checkpoint(run_feat_block, feature_image, combined_prompt, use_reentrant=False)
             else:
                 feature_image = cascade_block(feature_image, combined_prompt)
 
         kspace_pred = self._decode_output(feature_image)
 
+        # [MODIFIED] 체크포인팅 로직 수정
         if self.num_image_cascades > 0:
             for cascade_block in self.image_cascades:
                 if self.use_checkpoint and self.training:
+                    # `block=cascade_block`으로 현재 루프의 블록을 캡처
+                    def run_image_block(current_k, ref_k, m, sm, p, block=cascade_block):
+                        return block(current_k, ref_k, m, sm, p)
                     kspace_pred = checkpoint(
-                        cascade_block, kspace_pred, masked_kspace, mask,
-                        feature_image.sens_maps, combined_prompt, use_reentrant=False
+                        run_image_block,
+                        kspace_pred,
+                        masked_kspace,
+                        mask,
+                        feature_image.sens_maps,
+                        combined_prompt,
+                        use_reentrant=False
                     )
                 else:
                     kspace_pred = cascade_block(
-                        kspace_pred, masked_kspace, mask,
-                        feature_image.sens_maps, combined_prompt
+                        kspace_pred,
+                        masked_kspace,
+                        mask,
+                        feature_image.sens_maps,
+                        combined_prompt
                     )
 
         kspace_pred = kspace_pred / self.kspace_mult_factor
